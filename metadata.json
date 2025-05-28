@@ -1,0 +1,6 @@
+{
+  "name": "React Interactive Calendar",
+  "description": "Uma aplicação de calendário interativo construída com React, TypeScript e estilizada com Tailwind CSS. Permite aos usuários alternar entre visualizações mensais e anuais, navegar por datas e gerenciar atividades. (Apenas em Português do Brasil)",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
