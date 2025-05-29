@@ -14,7 +14,7 @@ import WelcomeHeader from './components/WelcomeHeader';
 import {
   ViewMode, Theme, Activity, Holiday, MOCK_NATIONAL_HOLIDAYS_PT_BR, MOCK_ACTIVITIES, ActivityType, HolidayType,
   MONTH_NAMES_PT, DAY_ABBREVIATIONS_PT, DAY_NAMES_PT, MOCK_SAINT_DAYS_PT_BR, MOCK_COMMEMORATIVE_DATES_PT_BR,
-  RecurrenceOption
+  RecurrenceOption, CustomRecurrenceValues, FrequencyUnit, CUSTOM_RECURRENCE_DAY_CODES
 } from './constants';
 import { MenuIcon, CloseIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon } from './components/icons';
 
@@ -26,11 +26,55 @@ export interface CalendarFilterOptions {
   showTasks: boolean;
 }
 
-// Define the new structure for eventsByDate
 export interface EventDateInfo {
-  colors: string[]; // Array of categoryColor strings for each activity
-  count: number;    // Total count of visible activities for the day
+  colors: string[];
+  count: number;
 }
+
+interface ParsedRrule {
+  freq?: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+  interval?: number;
+  byday?: string[]; // SU, MO, TU, WE, TH, FR, SA
+  until?: Date; // Date object in UTC
+  count?: number;
+}
+
+const parseRruleString = (rruleString: string): ParsedRrule | null => {
+  if (!rruleString || !rruleString.startsWith('FREQ=')) return null;
+
+  const parsed: ParsedRrule = {};
+  const parts = rruleString.split(';');
+  parts.forEach(part => {
+    const [key, value] = part.split('=');
+    if (!value) return;
+    switch (key) {
+      case 'FREQ':
+        parsed.freq = value as ParsedRrule['freq'];
+        break;
+      case 'INTERVAL':
+        parsed.interval = parseInt(value, 10);
+        break;
+      case 'BYDAY':
+        parsed.byday = value.split(',');
+        break;
+      case 'UNTIL': // Expects YYYYMMDDTHHMMSSZ
+        const year = parseInt(value.substring(0, 4), 10);
+        const month = parseInt(value.substring(4, 6), 10) - 1; // JS months are 0-indexed
+        const day = parseInt(value.substring(6, 8), 10);
+        const hour = parseInt(value.substring(9, 11), 10);
+        const minute = parseInt(value.substring(11, 13), 10);
+        const second = parseInt(value.substring(13, 15), 10);
+        parsed.until = new Date(Date.UTC(year, month, day, hour, minute, second));
+        break;
+      case 'COUNT':
+        parsed.count = parseInt(value, 10);
+        break;
+    }
+  });
+  if (!parsed.interval) parsed.interval = 1;
+  return parsed;
+};
+
 
 const App = (): JSX.Element => {
   const localizedMonthNames = MONTH_NAMES_PT;
@@ -209,7 +253,7 @@ const App = (): JSX.Element => {
   };
 
   const handleSaveActivity = (activityData: Omit<Activity, 'id'> & { id?: string }) => {
-    if (activityData.id && !activityData.id.startsWith('temp-')) { // Ensure not saving a temp ID from edit of recurrence
+    if (activityData.id && !activityData.id.startsWith('temp-')) {
       setActivities(prevActivities =>
         prevActivities.map(act => act.id === activityData.id ? { ...act, ...activityData } as Activity : act)
           .sort((a, b) => {
@@ -223,7 +267,7 @@ const App = (): JSX.Element => {
     } else {
       const newActivity: Activity = {
         ...activityData,
-        id: String(Date.now() + Math.random()), // Generate new ID for new activity
+        id: String(Date.now() + Math.random()),
       } as Activity;
       setActivities(prevActivities => [...prevActivities, newActivity].sort((a, b) => {
         const aTime = a.isAllDay ? "00:00" : a.startTime || "00:00";
@@ -238,12 +282,18 @@ const App = (): JSX.Element => {
   };
 
   const handleEditActivity = (activity: Activity) => {
-    // If the activity ID indicates it's a recurring instance (e.g., 'originalId-recur-date')
-    // we need to find the original activity to edit.
     const originalId = activity.id.includes('-recur-') ? activity.id.split('-recur-')[0] : activity.id;
-    const activityToLoadForEdit = activities.find(act => act.id === originalId) || activity;
+    const baseActivity = activities.find(act => act.id === originalId);
 
-    setActivityToEdit({ ...activityToLoadForEdit, date: activity.date }); // Pass the specific instance date for pre-filling
+    if (baseActivity) {
+      setActivityToEdit({
+        ...baseActivity,
+        date: activity.date,
+        id: baseActivity.id,
+      });
+    } else {
+      setActivityToEdit(activity);
+    }
     setIsCreateModalOpen(true);
   };
 
@@ -311,102 +361,175 @@ const App = (): JSX.Element => {
       if (!mapping[dateStr]) {
         mapping[dateStr] = { colors: [], count: 0 };
       }
-      mapping[dateStr].colors.push(activity.categoryColor);
+      // Avoid duplicate color dots if multiple instances of the same base activity fall on the same day due to aggressive iteration
+      if (!mapping[dateStr].colors.includes(activity.categoryColor) || mapping[dateStr].colors.length < 3) {
+        mapping[dateStr].colors.push(activity.categoryColor);
+      }
       mapping[dateStr].count++;
     };
 
+    const rruleDayToJsDay: { [key: string]: number } = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+
     activities.forEach(act => {
       const originalActivityDate = new Date(act.date + 'T00:00:00');
-      if (isNaN(originalActivityDate.getTime())) {
-        console.warn("Invalid date for activity:", act);
-        return;
-      }
+      if (isNaN(originalActivityDate.getTime())) return;
+
+      originalActivityDate.setHours(
+        act.startTime ? parseInt(act.startTime.split(':')[0]) : 0,
+        act.startTime ? parseInt(act.startTime.split(':')[1]) : 0,
+        0, 0
+      );
+
 
       if (originalActivityDate >= viewStartDate && originalActivityDate <= viewEndDate) {
         addActivityToMapping(act, originalActivityDate);
       }
 
-      if (act.recurrenceRule && act.recurrenceRule !== RecurrenceOption.NONE && act.recurrenceRule !== RecurrenceOption.CUSTOM) {
+      if (!act.recurrenceRule || act.recurrenceRule === RecurrenceOption.NONE) return;
+
+      const parsedRule = parseRruleString(act.recurrenceRule);
+      let simpleRuleType: RecurrenceOption | null = null;
+      Object.values(RecurrenceOption).forEach(val => {
+        if (val === act.recurrenceRule) simpleRuleType = val as RecurrenceOption;
+      });
+
+      if (parsedRule) { // Custom RRULE
+        let currentDateForIteration = new Date(originalActivityDate);
+        let occurrencesGenerated = 0;
+        const maxOccurrencesFromRule = parsedRule.count;
+        const maxIterationLimit = 700; // Safety limit for total iterations
+        let iterationCount = 0;
+
+        while (iterationCount < maxIterationLimit) {
+          iterationCount++;
+
+          if (maxOccurrencesFromRule && occurrencesGenerated >= maxOccurrencesFromRule) break;
+          // If currentDateForIteration is already past UNTIL or far beyond view, break.
+          if (parsedRule.until && currentDateForIteration.getTime() > parsedRule.until.getTime()) break;
+          if (currentDateForIteration.getFullYear() > viewEndDate.getFullYear() + 2) break; // Optimization
+
+          // Check instances from this iteration step
+          if (parsedRule.freq === 'WEEKLY' && parsedRule.byday && parsedRule.byday.length > 0) {
+            const ruleDaysJs = parsedRule.byday.map(d => rruleDayToJsDay[d]).sort((a, b) => a - b);
+            const currentIterDayOfWeek = currentDateForIteration.getDay();
+
+            for (const targetDayJs of ruleDaysJs) {
+              let potentialDate = new Date(currentDateForIteration);
+              potentialDate.setDate(potentialDate.getDate() + (targetDayJs - currentIterDayOfWeek));
+              // Restore original time of day from originalActivityDate
+              potentialDate.setHours(originalActivityDate.getHours(), originalActivityDate.getMinutes(), originalActivityDate.getSeconds(), originalActivityDate.getMilliseconds());
+
+
+              if (potentialDate.getTime() < originalActivityDate.getTime()) continue;
+              if (parsedRule.until && potentialDate.getTime() > parsedRule.until.getTime()) continue;
+              // Check COUNT against occurrencesGenerated *before* adding,
+              // but ensure this instance itself is part of the count.
+              if (maxOccurrencesFromRule && occurrencesGenerated >= maxOccurrencesFromRule && potentialDate.getTime() > currentDateForIteration.getTime()) {
+                // If count is met, only allow instances from the *current* iteration step's primary date, not future ones derived from BYDAY.
+                // This needs to be tied to when occurrencesGenerated is incremented.
+              }
+
+
+              if (potentialDate >= viewStartDate && potentialDate <= viewEndDate) {
+                // Avoid adding the original date again if it was already handled by the initial check outside this loop
+                if (potentialDate.getTime() !== originalActivityDate.getTime() ||
+                  (potentialDate.getTime() === originalActivityDate.getTime() && parsedRule.byday && !parsedRule.byday.includes(CUSTOM_RECURRENCE_DAY_CODES[originalActivityDate.getDay()])) ||
+                  (potentialDate.getTime() === originalActivityDate.getTime() && parsedRule.byday && parsedRule.byday.length > 1) // if byday includes original but also others
+                ) {
+                  addActivityToMapping(act, new Date(potentialDate));
+                } else if (potentialDate.getTime() === originalActivityDate.getTime() && !(originalActivityDate >= viewStartDate && originalActivityDate <= viewEndDate)) {
+                  // If original was NOT in view but its BYDAY recurrence IS the original date and IS in view
+                  addActivityToMapping(act, new Date(potentialDate));
+                }
+              }
+            }
+          } else { // DAILY, MONTHLY, YEARLY, or WEEKLY without BYDAY
+            if (currentDateForIteration.getTime() >= originalActivityDate.getTime()) {
+              if (currentDateForIteration >= viewStartDate && currentDateForIteration <= viewEndDate) {
+                // Avoid adding the original date again if it was already handled by the initial check
+                if (currentDateForIteration.getTime() !== originalActivityDate.getTime() || !(originalActivityDate >= viewStartDate && originalActivityDate <= viewEndDate)) {
+                  addActivityToMapping(act, new Date(currentDateForIteration));
+                }
+              }
+            }
+          }
+
+          // Increment occurrencesGenerated *after* processing the current iteration step (currentDateForIteration).
+          // This counts how many primary recurrence steps we've taken.
+          if (currentDateForIteration.getTime() >= originalActivityDate.getTime()) {
+            occurrencesGenerated++;
+            if (maxOccurrencesFromRule && occurrencesGenerated >= maxOccurrencesFromRule) break; // Check count limit immediately after increment
+          }
+
+          // Advance currentDateForIteration for the next cycle
+          const interval = parsedRule.interval || 1;
+          const tempAdvDate = new Date(currentDateForIteration);
+          let advanced = true;
+
+          switch (parsedRule.freq) {
+            case 'DAILY': tempAdvDate.setDate(tempAdvDate.getDate() + interval); break;
+            case 'WEEKLY': tempAdvDate.setDate(tempAdvDate.getDate() + (7 * interval)); break;
+            case 'MONTHLY':
+              const initialMonthlyDay = originalActivityDate.getDate();
+              tempAdvDate.setDate(1);
+              tempAdvDate.setMonth(tempAdvDate.getMonth() + interval);
+              const targetMonth = tempAdvDate.getMonth();
+              tempAdvDate.setDate(initialMonthlyDay);
+              if (tempAdvDate.getMonth() !== targetMonth) {
+                tempAdvDate.setMonth(targetMonth + 1); tempAdvDate.setDate(0);
+              }
+              break;
+            case 'YEARLY':
+              const initialYearlyMonth = originalActivityDate.getMonth();
+              const initialYearlyDay = originalActivityDate.getDate();
+              tempAdvDate.setDate(1);
+              tempAdvDate.setMonth(initialYearlyMonth);
+              tempAdvDate.setFullYear(tempAdvDate.getFullYear() + interval);
+              const targetYearMonth = tempAdvDate.getMonth();
+              tempAdvDate.setDate(initialYearlyDay);
+              if (tempAdvDate.getMonth() !== targetYearMonth) {
+                tempAdvDate.setMonth(targetYearMonth + 1); tempAdvDate.setDate(0);
+              }
+              break;
+            default: advanced = false; break;
+          }
+
+          if (!advanced || tempAdvDate.getTime() <= currentDateForIteration.getTime()) break;
+          currentDateForIteration.setTime(tempAdvDate.getTime());
+        }
+      } else if (simpleRuleType && simpleRuleType !== RecurrenceOption.CUSTOM) {
         let currentDate = new Date(originalActivityDate);
         const maxRecurrenceYear = displayedYear + 2;
 
-        switch (act.recurrenceRule) {
-          case RecurrenceOption.DAILY:
-            currentDate.setDate(currentDate.getDate() + 1);
-            while (currentDate <= viewEndDate && currentDate.getFullYear() < maxRecurrenceYear) {
-              if (currentDate >= viewStartDate) {
-                addActivityToMapping(act, new Date(currentDate));
-              }
-              currentDate.setDate(currentDate.getDate() + 1);
-            }
-            break;
-
-          case RecurrenceOption.WEEKLY:
-            currentDate.setDate(currentDate.getDate() + 7);
-            while (currentDate <= viewEndDate && currentDate.getFullYear() < maxRecurrenceYear) {
-              if (currentDate >= viewStartDate) {
-                addActivityToMapping(act, new Date(currentDate));
-              }
-              currentDate.setDate(currentDate.getDate() + 7);
-            }
-            break;
-
+        switch (simpleRuleType) {
+          case RecurrenceOption.DAILY: currentDate.setDate(currentDate.getDate() + 1); break;
+          case RecurrenceOption.WEEKLY: currentDate.setDate(currentDate.getDate() + 7); break;
           case RecurrenceOption.MONTHLY:
-            const originalDayOfMonth = originalActivityDate.getDate();
-            currentDate = new Date(originalActivityDate); // Reset current date to original
+            const dayOfMonth = currentDate.getDate();
             currentDate.setMonth(currentDate.getMonth() + 1);
-            currentDate.setDate(originalDayOfMonth);
+            if (currentDate.getDate() !== dayOfMonth) currentDate.setDate(0);
+            break;
+          case RecurrenceOption.YEARLY: currentDate.setFullYear(currentDate.getFullYear() + 1); break;
+          default: return;
+        }
 
-            while (currentDate.getFullYear() < maxRecurrenceYear) {
-              if (currentDate.getDate() !== originalDayOfMonth) { // Day rolled over
-                let nextTryDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), originalDayOfMonth);
-                if (nextTryDate.getMonth() === currentDate.getMonth() && nextTryDate.getDate() !== originalDayOfMonth) { // still didn't work
-                  // This means original day doesn't exist this month, advance to next month for next loop iteration
-                  currentDate.setMonth(currentDate.getMonth() + 1);
-                  currentDate.setDate(originalDayOfMonth);
-                  continue;
-                } else {
-                  currentDate = nextTryDate;
-                }
-              }
-              if (currentDate > viewEndDate && currentDate.getFullYear() === displayedYear && currentDate.getMonth() === displayedMonth) break;
-              if (currentDate > viewEndDate && (currentDate.getFullYear() > displayedYear || currentDate.getMonth() > displayedMonth)) break;
-
-
-              if (currentDate >= viewStartDate && currentDate <= viewEndDate) {
-                addActivityToMapping(act, new Date(currentDate));
-              }
-
+        while (currentDate.getFullYear() < maxRecurrenceYear && currentDate <= viewEndDate) {
+          if (currentDate >= viewStartDate) {
+            addActivityToMapping(act, new Date(currentDate));
+          }
+          switch (simpleRuleType) {
+            case RecurrenceOption.DAILY: currentDate.setDate(currentDate.getDate() + 1); break;
+            case RecurrenceOption.WEEKLY: currentDate.setDate(currentDate.getDate() + 7); break;
+            case RecurrenceOption.MONTHLY:
+              const dayOfMonth = originalActivityDate.getDate();
               currentDate.setMonth(currentDate.getMonth() + 1);
-              currentDate.setDate(originalDayOfMonth);
-            }
+              if (currentDate.getDate() !== dayOfMonth) currentDate.setDate(0);
+              break;
+            case RecurrenceOption.YEARLY: currentDate.setFullYear(currentDate.getFullYear() + 1); break;
+          }
+          if (currentDate.getTime() <= originalActivityDate.getTime() && simpleRuleType !== RecurrenceOption.DAILY) {
             break;
-
-          case RecurrenceOption.YEARLY:
-            const originalMonth = originalActivityDate.getMonth();
-            const originalYrDay = originalActivityDate.getDate();
-            currentDate = new Date(originalActivityDate); // Reset
-            currentDate.setFullYear(currentDate.getFullYear() + 1);
-            currentDate.setMonth(originalMonth);
-            currentDate.setDate(originalYrDay);
-
-            while (currentDate.getFullYear() < maxRecurrenceYear + 3) {
-              if (currentDate.getMonth() !== originalMonth || currentDate.getDate() !== originalYrDay) {
-                currentDate = new Date(currentDate.getFullYear() + 1, originalMonth, originalYrDay);
-                continue;
-              }
-              if (currentDate > viewEndDate && currentDate.getFullYear() === displayedYear && currentDate.getMonth() === displayedMonth) break;
-              if (currentDate > viewEndDate && (currentDate.getFullYear() > displayedYear || currentDate.getMonth() > displayedMonth)) break;
-
-
-              if (currentDate >= viewStartDate && currentDate <= viewEndDate) {
-                addActivityToMapping(act, new Date(currentDate));
-              }
-              currentDate.setFullYear(currentDate.getFullYear() + 1);
-              currentDate.setMonth(originalMonth);
-              currentDate.setDate(originalYrDay);
-            }
-            break;
+          }
         }
       }
     });
@@ -502,103 +625,199 @@ const App = (): JSX.Element => {
     if (!selectedDate) return [];
 
     const selectedDateString = selectedDate.toISOString().split('T')[0];
-    const targetDate = new Date(selectedDateString + 'T00:00:00');
+    const targetDateLocal = new Date(selectedDateString + 'T00:00:00');
     const activitiesOccurringOnSelectedDate: Activity[] = [];
-    const addedOriginalActivityIds = new Set<string>();
 
+    const LOCAL_CUSTOM_RECURRENCE_DAY_CODES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
     const addActivityInstanceToList = (activity: Activity, instanceDateString: string, isRecurrence: boolean) => {
       if (activity.activityType === ActivityType.EVENT && !filterOptions.showEvents) return;
       if (activity.activityType === ActivityType.TASK && !filterOptions.showTasks) return;
 
-      const instanceId = isRecurrence ? `${activity.id}-recur-${instanceDateString}` : activity.id;
-
-      // Avoid adding the same original activity multiple times if its original date is the selectedDate
-      // AND it also matches a recurrence check for the same day (which shouldn't happen with current recurrence logic).
-      // More importantly, ensure that if original day = selected date, we don't add it again via recurrence path.
-      if (addedOriginalActivityIds.has(activity.id) && activity.date === instanceDateString && !isRecurrence) {
-        // Already added as original, and this is an attempt to add original again.
+      const instanceId = isRecurrence ? `${activity.id}-recur-${instanceDateString}-${Date.now()}` : activity.id; // Add timestamp for uniqueness
+      if (activitiesOccurringOnSelectedDate.some(a => a.id === instanceId && a.date === instanceDateString)) {
         return;
       }
-      if (addedOriginalActivityIds.has(activity.id) && isRecurrence) {
-        // If original was already added (because its date is selectedDate), don't add its "recurrence" on the same day.
-        // This check is a bit nuanced. The main goal is one visual entry per distinct activity on a given day.
-      }
-
 
       activitiesOccurringOnSelectedDate.push({
         ...activity,
         date: instanceDateString,
         id: instanceId,
       });
-      if (!isRecurrence) {
-        addedOriginalActivityIds.add(activity.id);
-      }
     };
 
     activities.forEach(act => {
-      const originalActivityDate = new Date(act.date + 'T00:00:00');
-      if (isNaN(originalActivityDate.getTime())) return;
+      const originalActivityDateLocal = new Date(act.date + 'T00:00:00');
+      if (isNaN(originalActivityDateLocal.getTime())) return;
 
-      // 1. Check original instance
+      originalActivityDateLocal.setHours(
+        act.startTime ? parseInt(act.startTime.split(':')[0]) : 0,
+        act.startTime ? parseInt(act.startTime.split(':')[1]) : 0,
+        0, 0
+      );
+
+
       if (act.date === selectedDateString) {
         addActivityInstanceToList(act, selectedDateString, false);
       }
-      // 2. Check recurring instances (only if original date is NOT the selected date for this path)
-      else if (act.recurrenceRule && act.recurrenceRule !== RecurrenceOption.NONE && act.recurrenceRule !== RecurrenceOption.CUSTOM && targetDate >= originalActivityDate) {
-        let occursOnSelectedDate = false;
-        switch (act.recurrenceRule) {
-          case RecurrenceOption.DAILY: // A daily event occurs on targetDate if targetDate >= originalActivityDate
-            occursOnSelectedDate = true;
-            break;
-          case RecurrenceOption.WEEKLY:
-            if (targetDate.getDay() === originalActivityDate.getDay()) {
-              const diffTime = targetDate.getTime() - originalActivityDate.getTime(); // Difference in milliseconds
-              if (diffTime >= 0) { // Ensure targetDate is on or after originalActivityDate
-                const diffDays = diffTime / (1000 * 60 * 60 * 24);
-                if (diffDays % 7 === 0) {
-                  occursOnSelectedDate = true;
+
+      if (act.recurrenceRule && act.recurrenceRule !== RecurrenceOption.NONE) {
+        const parsedRule = parseRruleString(act.recurrenceRule);
+        let simpleRuleType: RecurrenceOption | null = null;
+        Object.values(RecurrenceOption).forEach(val => {
+          if (val === act.recurrenceRule) simpleRuleType = val as RecurrenceOption;
+        });
+
+        const rruleDayToJsDay: { [key: string]: number } = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+
+        if (parsedRule) { // Custom RRULE
+          let currentDateForIteration = new Date(originalActivityDateLocal);
+          let occurrencesGenerated = 0;
+          const maxOccurrencesFromRule = parsedRule.count;
+          const maxIterationLimit = 700;
+          let iterationCount = 0;
+
+          while (iterationCount < maxIterationLimit) {
+            iterationCount++;
+
+            if (maxOccurrencesFromRule && occurrencesGenerated >= maxOccurrencesFromRule) break;
+            if (parsedRule.until && currentDateForIteration.getTime() > parsedRule.until.getTime()) break;
+
+            let margin = 0; // Approximation for optimization break
+            if (parsedRule.freq === 'WEEKLY') margin = 7 * 24 * 60 * 60 * 1000;
+            else if (parsedRule.freq === 'MONTHLY') margin = 31 * 24 * 60 * 60 * 1000;
+            else if (parsedRule.freq === 'YEARLY') margin = 366 * 24 * 60 * 60 * 1000;
+            if (currentDateForIteration.getTime() > targetDateLocal.getTime() + margin && currentDateForIteration.toISOString().split('T')[0] !== selectedDateString) {
+              break;
+            }
+
+            let foundOnThisIterationStep = false;
+
+            if (parsedRule.freq === 'WEEKLY' && parsedRule.byday && parsedRule.byday.length > 0) {
+              const ruleDaysJs = parsedRule.byday.map(d => rruleDayToJsDay[d]).sort((a, b) => a - b);
+              const currentIterDayOfWeek = currentDateForIteration.getDay();
+
+              for (const targetDayJs of ruleDaysJs) {
+                let potentialDate = new Date(currentDateForIteration);
+                potentialDate.setDate(potentialDate.getDate() + (targetDayJs - currentIterDayOfWeek));
+                potentialDate.setHours(originalActivityDateLocal.getHours(), originalActivityDateLocal.getMinutes(), originalActivityDateLocal.getSeconds(), originalActivityDateLocal.getMilliseconds());
+
+                if (potentialDate.getTime() < originalActivityDateLocal.getTime()) continue;
+                if (parsedRule.until && potentialDate.getTime() > parsedRule.until.getTime()) continue;
+                // Check count for byday instance
+                if (maxOccurrencesFromRule && occurrencesGenerated >= maxOccurrencesFromRule && potentialDate.getTime() > currentDateForIteration.getTime()) continue;
+
+
+                if (potentialDate.toISOString().split('T')[0] === selectedDateString) {
+                  if (potentialDate.getTime() !== originalActivityDateLocal.getTime() || act.date !== selectedDateString) {
+                    addActivityInstanceToList(act, selectedDateString, true);
+                    foundOnThisIterationStep = true;
+                    break;
+                  } else if (potentialDate.getTime() === originalActivityDateLocal.getTime() && act.date === selectedDateString) {
+                    // Already added by the non-recurring check, but ensure it respects BYDAY if it's the original
+                    if (parsedRule.byday.includes(LOCAL_CUSTOM_RECURRENCE_DAY_CODES[originalActivityDateLocal.getDay()])) {
+                      // It's the original date AND it matches a BYDAY rule.
+                      // addActivityInstanceToList handles duplicates.
+                      foundOnThisIterationStep = true; // To break outer loop if found.
+                      break;
+                    }
+                  }
+                }
+              }
+            } else {
+              if (currentDateForIteration.getTime() >= originalActivityDateLocal.getTime()) {
+                if (currentDateForIteration.toISOString().split('T')[0] === selectedDateString) {
+                  if (currentDateForIteration.getTime() !== originalActivityDateLocal.getTime() || act.date !== selectedDateString) {
+                    addActivityInstanceToList(act, selectedDateString, true);
+                    foundOnThisIterationStep = true;
+                  }
                 }
               }
             }
-            break;
-          case RecurrenceOption.MONTHLY:
-            if (targetDate.getDate() === originalActivityDate.getDate()) {
-              // Ensure it's actually a future month or year if not the original date
-              if (targetDate.getFullYear() > originalActivityDate.getFullYear() ||
-                (targetDate.getFullYear() === originalActivityDate.getFullYear() && targetDate.getMonth() > originalActivityDate.getMonth())) {
-                occursOnSelectedDate = true;
+
+            if (foundOnThisIterationStep) break;
+
+            if (currentDateForIteration.getTime() >= originalActivityDateLocal.getTime()) {
+              occurrencesGenerated++;
+              if (maxOccurrencesFromRule && occurrencesGenerated >= maxOccurrencesFromRule) break;
+            }
+
+            const interval = parsedRule.interval || 1;
+            const tempAdvDate = new Date(currentDateForIteration);
+            let advanced = true;
+            switch (parsedRule.freq) {
+              case 'DAILY': tempAdvDate.setDate(tempAdvDate.getDate() + interval); break;
+              case 'WEEKLY': tempAdvDate.setDate(tempAdvDate.getDate() + (7 * interval)); break;
+              case 'MONTHLY':
+                const initialMonthlyDay = originalActivityDateLocal.getDate();
+                tempAdvDate.setDate(1);
+                tempAdvDate.setMonth(tempAdvDate.getMonth() + interval);
+                const targetMonthM = tempAdvDate.getMonth();
+                tempAdvDate.setDate(initialMonthlyDay);
+                if (tempAdvDate.getMonth() !== targetMonthM) {
+                  tempAdvDate.setMonth(targetMonthM + 1); tempAdvDate.setDate(0);
+                }
+                break;
+              case 'YEARLY':
+                const initialYearlyMonth = originalActivityDateLocal.getMonth();
+                const initialYearlyDay = originalActivityDateLocal.getDate();
+                tempAdvDate.setDate(1);
+                tempAdvDate.setMonth(initialYearlyMonth);
+                tempAdvDate.setFullYear(tempAdvDate.getFullYear() + interval);
+                const targetYearMonthY = tempAdvDate.getMonth();
+                tempAdvDate.setDate(initialYearlyDay);
+                if (tempAdvDate.getMonth() !== targetYearMonthY) {
+                  tempAdvDate.setMonth(targetYearMonthY + 1); tempAdvDate.setDate(0);
+                }
+                break;
+              default: advanced = false; break;
+            }
+            if (!advanced || tempAdvDate.getTime() <= currentDateForIteration.getTime()) break;
+            currentDateForIteration.setTime(tempAdvDate.getTime());
+          }
+        } else if (simpleRuleType && simpleRuleType !== RecurrenceOption.CUSTOM) {
+          let currentDate = new Date(originalActivityDateLocal);
+          const maxSimpleIterations = 500;
+          let iter = 0;
+
+          while (iter < maxSimpleIterations) {
+            if (iter > 0 || currentDate.getTime() === originalActivityDateLocal.getTime()) {
+              switch (simpleRuleType) {
+                case RecurrenceOption.DAILY: currentDate.setDate(currentDate.getDate() + 1); break;
+                case RecurrenceOption.WEEKLY: currentDate.setDate(currentDate.getDate() + 7); break;
+                case RecurrenceOption.MONTHLY:
+                  const day = originalActivityDateLocal.getDate();
+                  currentDate.setMonth(currentDate.getMonth() + 1); // Add month first
+                  currentDate.setDate(day); // Then set day
+                  if (currentDate.getDate() !== day) currentDate.setDate(0); // Adjust if day rolled over month
+                  break;
+                case RecurrenceOption.YEARLY:
+                  const yearMonth = originalActivityDateLocal.getMonth();
+                  const yearDay = originalActivityDateLocal.getDate();
+                  currentDate.setFullYear(currentDate.getFullYear() + 1, yearMonth, yearDay);
+                  if (currentDate.getMonth() !== yearMonth || currentDate.getDate() !== yearDay) currentDate.setDate(0);
+                  break;
+                default: iter = maxSimpleIterations; break;
               }
             }
-            break;
-          case RecurrenceOption.YEARLY:
-            if (targetDate.getMonth() === originalActivityDate.getMonth() &&
-              targetDate.getDate() === originalActivityDate.getDate()) {
-              // Ensure it's actually a future year if not the original date
-              if (targetDate.getFullYear() > originalActivityDate.getFullYear()) {
-                occursOnSelectedDate = true;
+            if (currentDate.toISOString().split('T')[0] === selectedDateString) {
+              if (currentDate.getTime() !== originalActivityDateLocal.getTime() || act.date !== selectedDateString) {
+                addActivityInstanceToList(act, selectedDateString, true);
               }
+              break;
             }
-            break;
-        }
-        if (occursOnSelectedDate) {
-          // Check if this specific recurrence (identified by original act.id) is already added
-          // This is to prevent adding it if its original date was also the selectedDate and already handled.
-          if (!addedOriginalActivityIds.has(act.id) || act.date !== selectedDateString) {
-            addActivityInstanceToList(act, selectedDateString, true);
+            if (currentDate.getTime() > targetDateLocal.getTime() && iter > 0) break;
+            if (currentDate.getFullYear() > originalActivityDateLocal.getFullYear() + 5 && iter > 0) break;
+            iter++;
+            if (iter === 0 && currentDate.getTime() !== originalActivityDateLocal.getTime()) { // If first check was not original, increment iter
+              iter++;
+            }
           }
         }
       }
     });
 
-    // Deduplicate based on the generated instanceId to ensure each visual item is unique
-    const finalActivitiesMap = new Map<string, Activity>();
-    activitiesOccurringOnSelectedDate.forEach(activity => {
-      finalActivitiesMap.set(activity.id, activity);
-    });
-    const uniqueActivities = Array.from(finalActivitiesMap.values());
-
-    return uniqueActivities.sort((a, b) => {
+    return activitiesOccurringOnSelectedDate.sort((a, b) => {
       const aTime = a.isAllDay ? "00:00" : a.startTime || "00:00";
       const bTime = b.isAllDay ? "00:00" : b.startTime || "00:00";
       if (a.isAllDay && !b.isAllDay) return -1;
@@ -791,8 +1010,8 @@ const App = (): JSX.Element => {
                             handleDateSelect(date);
                             setViewMode(ViewMode.MONTHLY);
                           }}
-                          eventsByDate={eventsByDate}
-                          holidaysByDate={holidaysByDate}
+                          eventsByDate={eventsByDate} // This needs to be calculated per month for yearly view
+                          holidaysByDate={holidaysByDate} // This also needs to be calculated per month for yearly view
                           localizedDayAbbreviations={localizedDayAbbreviations}
                           localizedDayFullNames={localizedDayFullNames}
                         />

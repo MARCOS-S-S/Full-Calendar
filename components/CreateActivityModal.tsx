@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Activity, ActivityType, Theme, RecurrenceOption, RECURRENCE_OPTIONS_PT } from '../constants';
-import { CloseIcon, ClockIcon, LocationMarkerIcon, BellIcon, DocumentTextIcon, SparklesIcon, ArrowPathIcon, GlobeAltIcon, UserGroupIcon, PaperClipIcon } from './icons';
+import { Activity, ActivityType, Theme, RecurrenceOption, RECURRENCE_OPTIONS_PT, CustomRecurrenceValues } from '../constants';
+import { CloseIcon, ClockIcon, LocationMarkerIcon, BellIcon, DocumentTextIcon, SparklesIcon, ArrowPathIcon, GlobeAltIcon, UserGroupIcon, PaperClipIcon, ChevronLeftIcon } from './icons';
+import CustomRecurrenceModal from './CustomRecurrenceModal'; // Import the new modal
 
 interface CreateActivityModalProps {
   isOpen: boolean;
@@ -37,6 +38,11 @@ const formatTimeForInput = (date: Date): string => {
   return `${hours}:${minutes}`;
 };
 
+const isCustomRRule = (rule?: string): boolean => {
+  return !!rule && rule.startsWith('FREQ=');
+};
+
+
 const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   isOpen,
   onClose,
@@ -61,10 +67,12 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   const [categoryColor, setCategoryColor] = useState<string>(activityTypeColors[ActivityType.EVENT]);
   const [userHasPickedColor, setUserHasPickedColor] = useState<boolean>(false);
 
-  const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceOption>(RecurrenceOption.NONE);
+  const [recurrenceRule, setRecurrenceRule] = useState<string>(RecurrenceOption.NONE);
   const [isRecurrencePickerOpen, setIsRecurrencePickerOpen] = useState(false);
   const recurrencePickerRef = useRef<HTMLDivElement>(null);
   const recurrenceButtonRef = useRef<HTMLButtonElement>(null);
+
+  const [isCustomRecurrenceModalOpen, setIsCustomRecurrenceModalOpen] = useState(false);
 
 
   useEffect(() => {
@@ -74,7 +82,7 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
         setTitle(activityToEdit.title);
         setActivityType(activityToEdit.activityType);
         setIsAllDay(activityToEdit.isAllDay);
-        setStartDate(activityToEdit.date);
+        setStartDate(activityToEdit.date); // This is the instance date for editing
         setStartTime(activityToEdit.startTime || formatTimeForInput(new Date(new Date().setHours(new Date().getHours() + 1, 0, 0, 0))));
 
         const parsedStartDate = new Date(activityToEdit.date + 'T' + (activityToEdit.startTime || '00:00'));
@@ -102,7 +110,8 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
         setUserHasPickedColor(false);
         setRecurrenceRule(RecurrenceOption.NONE);
       }
-      setIsRecurrencePickerOpen(false); // Close picker on modal open/re-render
+      setIsRecurrencePickerOpen(false);
+      setIsCustomRecurrenceModalOpen(false);
     }
   }, [isOpen, selectedDate, activityToEdit]);
 
@@ -140,20 +149,41 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
       return;
     }
     setTitleError(null);
+
+    // If editing a recurring event instance, we need the original activity's start date for the recurrence rule.
+    // The `activityToEdit.date` might be the instance's date, not the original series start.
+    // However, RRULEs are typically defined relative to the *first* occurrence.
+    // For simplicity now, the `startDate` field IS the main date for the activity being saved.
+    // If it's an edit of a series, `activityToEdit.id` is the original ID. `startDate` here should be `activityToEdit.date` from the series.
+
+    let activityDateToSave = startDate;
+    if (activityToEdit && activityToEdit.id && !activityToEdit.id.includes('-recur-')) {
+      // If we are editing the original definition of a recurring event
+      activityDateToSave = activityToEdit.date;
+    } else if (activityToEdit && activityToEdit.id && activityToEdit.id.includes('-recur-')) {
+      // If we are editing an instance that was generated (this path should ideally lead to editing the series or this instance only)
+      // For now, editing an instance means editing the whole series based on its original definition.
+      // We'd need to find the original activity to get its original start date if the RRULE needs to be re-evaluated from scratch.
+      // This simplified model assumes the RRULE is self-contained and the `startDate` is for THIS instance.
+      // The `App.tsx` handles saving based on original ID if it's an edit.
+    }
+
+
     const activityData: Omit<Activity, 'id'> & { id?: string } = {
-      id: activityToEdit ? activityToEdit.id : undefined,
+      id: activityToEdit ? (activityToEdit.id.includes('-recur-') ? activityToEdit.id.split('-recur-')[0] : activityToEdit.id) : undefined,
       title: title.trim(),
       activityType,
-      date: startDate,
+      date: activityDateToSave, // This should be the original start date of the series for the RRULE.
       isAllDay,
       startTime: isAllDay ? undefined : startTime,
       endTime: isAllDay ? undefined : endTime,
       location: location.trim() || undefined,
       description: description.trim() || undefined,
       categoryColor,
-      recurrenceRule,
+      recurrenceRule: recurrenceRule === RecurrenceOption.NONE ? undefined : recurrenceRule,
     };
     onSave(activityData);
+    onClose(); // Ensure modal closes after save
   };
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -163,10 +193,20 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
     }
   };
 
-  const handleRecurrenceOptionSelect = (option: RecurrenceOption) => {
-    setRecurrenceRule(option);
+  const handleRecurrenceOptionSelect = (option: RecurrenceOption | string) => {
+    if (option === RecurrenceOption.CUSTOM) {
+      setIsCustomRecurrenceModalOpen(true);
+    } else {
+      setRecurrenceRule(option as string);
+    }
     setIsRecurrencePickerOpen(false);
   };
+
+  const handleCustomRecurrenceSave = (customRule: string) => {
+    setRecurrenceRule(customRule);
+    setIsCustomRecurrenceModalOpen(false);
+  };
+
 
   const inputBaseClass = "w-full bg-transparent border-b py-2 focus:outline-none text-sm";
   const inputBorderClass = currentTheme === Theme.LIGHT ? "border-gray-300 focus:border-rose-500" : "border-neutral-700 focus:border-sky-500";
@@ -181,8 +221,23 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   const radioSelectedColor = currentTheme === Theme.LIGHT ? 'border-rose-500 bg-rose-500' : 'border-sky-500 bg-sky-500';
   const radioUnselectedColor = currentTheme === Theme.LIGHT ? 'border-gray-400' : 'border-neutral-500';
 
+  const displayedRecurrenceText = isCustomRRule(recurrenceRule) ? "Regra Personalizada" : recurrenceRule;
+
 
   if (!isOpen) return null;
+  if (isCustomRecurrenceModalOpen) {
+    return (
+      <CustomRecurrenceModal
+        isOpen={isCustomRecurrenceModalOpen}
+        onClose={() => setIsCustomRecurrenceModalOpen(false)}
+        onSave={handleCustomRecurrenceSave}
+        currentTheme={currentTheme}
+        initialActivityDate={startDate} // Pass the current start date of the activity
+        currentRRuleString={isCustomRRule(recurrenceRule) ? recurrenceRule : undefined}
+      />
+    );
+  }
+
 
   return (
     <div
@@ -192,14 +247,18 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
       aria-labelledby="create-activity-title"
     >
       <div
-        className="flex flex-col h-full overflow-y-auto"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
+        className="flex flex-col h-full" // Removed overflow-y-auto, will be on main
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.0rem)' }} // Reduced top padding
       >
-        <header className={`flex items-center justify-between p-4 border-b ${sectionBorderClass}`}>
-          <button onClick={onClose} className="p-2" aria-label="Fechar">
+        <header className={`flex items-center justify-between p-3 border-b ${sectionBorderClass} flex-shrink-0`}>
+          <button
+            onClick={onClose}
+            className={`p-2 rounded-full ${currentTheme === Theme.DARK ? 'hover:bg-neutral-700' : 'hover:bg-gray-100'}`}
+            aria-label="Fechar"
+          >
             <CloseIcon className={`w-6 h-6 ${currentTheme === Theme.DARK ? 'text-neutral-300' : 'text-gray-600'}`} />
           </button>
-          <div className="flex-grow mx-4">
+          <div className="flex-grow mx-3">
             <input
               id="create-activity-title"
               type="text"
@@ -217,9 +276,15 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
               </p>
             )}
           </div>
+          <button
+            onClick={handleSave}
+            className={`px-4 py-1.5 text-sm font-semibold rounded-md ${currentTheme === Theme.DARK ? 'bg-sky-600 text-white hover:bg-sky-500' : 'bg-rose-500 text-white hover:bg-rose-600'} flex-shrink-0`}
+          >
+            {activityToEdit ? "Atualizar" : "Salvar"}
+          </button>
         </header>
 
-        <main className="flex-grow p-4 space-y-6 relative">
+        <main className="flex-grow p-4 space-y-5 overflow-y-auto">
           <div className="flex space-x-2">
             {[ActivityType.EVENT, ActivityType.TASK, ActivityType.BIRTHDAY].map(type => (
               <button
@@ -275,7 +340,7 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
               aria-controls="recurrence-options-list"
             >
               <ArrowPathIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
-              <span>{recurrenceRule}</span>
+              <span>{displayedRecurrenceText}</span>
             </button>
             {isRecurrencePickerOpen && (
               <div
@@ -283,20 +348,22 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                 id="recurrence-options-list"
                 className={`absolute left-0 right-0 mt-2 p-3 rounded-lg shadow-xl z-10 ${pickerBgColor} ${pickerBorderColor} border`}
                 role="listbox"
-                aria-activedescendant={recurrenceRule} // Might need to assign IDs to options for this
               >
-                {RECURRENCE_OPTIONS_PT.map(option => (
+                {RECURRENCE_OPTIONS_PT.map(optionValue => (
                   <div
-                    key={option}
+                    key={optionValue}
                     role="option"
-                    aria-selected={recurrenceRule === option}
-                    onClick={() => handleRecurrenceOptionSelect(option)}
+                    aria-selected={recurrenceRule === optionValue || (optionValue === RecurrenceOption.CUSTOM && isCustomRRule(recurrenceRule))}
+                    onClick={() => handleRecurrenceOptionSelect(optionValue)}
                     className={`flex items-center p-2.5 rounded-md cursor-pointer ${pickerTextColor} ${currentTheme === Theme.LIGHT ? 'hover:bg-gray-100' : 'hover:bg-neutral-700'}`}
                   >
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mr-3 ${recurrenceRule === option ? radioSelectedColor : radioUnselectedColor}`}>
-                      {recurrenceRule === option && <div className="w-2.5 h-2.5 bg-white rounded-full"></div>}
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mr-3 ${(recurrenceRule === optionValue || (optionValue === RecurrenceOption.CUSTOM && isCustomRRule(recurrenceRule)))
+                        ? radioSelectedColor : radioUnselectedColor}`
+                    }>
+                      {(recurrenceRule === optionValue || (optionValue === RecurrenceOption.CUSTOM && isCustomRRule(recurrenceRule))) &&
+                        <div className="w-2.5 h-2.5 bg-white rounded-full"></div>}
                     </div>
-                    <span>{option}</span>
+                    <span>{optionValue === RecurrenceOption.CUSTOM && isCustomRRule(recurrenceRule) ? displayedRecurrenceText : optionValue}</span>
                   </div>
                 ))}
               </div>
@@ -368,15 +435,7 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
             <span className={textColorClass}>Adicionar anexo do Google Drive (Espaço reservado)</span>
           </div>
         </main>
-
-        <footer className={`flex items-center justify-end p-4 border-t ${sectionBorderClass}`}>
-          <button
-            onClick={handleSave}
-            className={`px-4 py-2 text-sm font-semibold rounded-md ${currentTheme === Theme.DARK ? 'bg-sky-600 text-white hover:bg-sky-500' : 'bg-rose-500 text-white hover:bg-rose-600'}`}
-          >
-            {activityToEdit ? "Atualizar" : "Salvar"}
-          </button>
-        </footer>
+        {/* Footer removed, save button moved to header */}
       </div>
     </div>
   );

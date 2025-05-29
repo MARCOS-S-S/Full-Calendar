@@ -22,7 +22,7 @@ export enum RecurrenceOption {
   WEEKLY = "Toda semana",
   MONTHLY = "Todo mês",
   YEARLY = "Todo ano",
-  CUSTOM = "Personalizado..."
+  CUSTOM = "Personalizado..." // This value itself won't be stored; a custom rule string will.
 }
 
 export const RECURRENCE_OPTIONS_PT: RecurrenceOption[] = [
@@ -34,6 +34,16 @@ export const RECURRENCE_OPTIONS_PT: RecurrenceOption[] = [
   RecurrenceOption.CUSTOM,
 ];
 
+export type FrequencyUnit = 'day' | 'week' | 'month' | 'year';
+
+export interface CustomRecurrenceValues {
+  interval: number;
+  frequencyUnit: FrequencyUnit;
+  daysOfWeek?: string[]; // SU, MO, TU, WE, TH, FR, SA
+  endsOn: 'never' | 'date' | 'occurrences';
+  endDate?: string; // YYYY-MM-DD
+  occurrences?: number;
+}
 
 export interface Activity {
   id: string;
@@ -46,7 +56,7 @@ export interface Activity {
   description?: string;
   categoryColor: string;
   activityType: ActivityType;
-  recurrenceRule?: RecurrenceOption; // Added for recurrence
+  recurrenceRule?: string; // Can be RecurrenceOption value or a custom RRULE string
 }
 
 export enum HolidayType {
@@ -70,7 +80,23 @@ export const MONTH_NAMES_PT = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ];
 
+// For general calendar display (e.g., MonthView headers)
 export const DAY_ABBREVIATIONS_PT = ["D", "S", "T", "Q", "Q", "S", "S"]; // Sunday first
+
+// For custom recurrence UI and RRULE generation (Sunday first)
+export const WEEKDAY_MAP_PT_TO_RRULE: { [key: string]: string } = {
+  'D': 'SU', // Domingo
+  'S': 'MO', // Segunda (assuming the first S is Sunday)
+  'T': 'TU', // Terça
+  'Q': 'WE', // Quarta (first Q)
+  'Q2': 'TH', // Quinta (second Q - need a unique key if display is same)
+  'S2': 'FR', // Sexta (second S)
+  'S3': 'SA'  // Sábado (third S)
+};
+// For CustomRecurrenceModal display (matching image: S M T W T F S)
+export const CUSTOM_RECURRENCE_DAY_ABBREVS_PT = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']; // Domingo, Segunda, Terça, Quarta, Quinta, Sexta, Sábado
+export const CUSTOM_RECURRENCE_DAY_CODES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
 
 export const DAY_NAMES_PT = [
   "Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"
