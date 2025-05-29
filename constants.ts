@@ -55,21 +55,49 @@ export const DAY_NAMES_PT = [
   "Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"
 ];
 
-
+// TODO: Preencher completamente os feriados nacionais para o intervalo de [ano_atual - 20] até [ano_atual + 20].
+// Exemplo: Se o ano atual é 2024, preencher de 2004 até 2044.
+// Abaixo, uma amostra para ilustração.
 export const MOCK_NATIONAL_HOLIDAYS_PT_BR: Holiday[] = [
-  // 2024 (current year based on common usage, good for testing)
+  // --- Amostra Passado Distante (ex: 2004) ---
+  { date: '2004-01-01', name: 'Confraternização Universal', type: HolidayType.NATIONAL },
+  { date: '2004-02-24', name: 'Carnaval (Ponto Facultativo Nacional)', type: HolidayType.NATIONAL },
+  { date: '2004-04-09', name: 'Sexta-feira Santa', type: HolidayType.NATIONAL },
+  { date: '2004-04-21', name: 'Tiradentes', type: HolidayType.NATIONAL },
+  { date: '2004-05-01', name: 'Dia do Trabalho', type: HolidayType.NATIONAL },
+  { date: '2004-06-10', name: 'Corpus Christi (Ponto Facultativo Nacional)', type: HolidayType.NATIONAL },
+  { date: '2004-09-07', name: 'Independência do Brasil', type: HolidayType.NATIONAL },
+  { date: '2004-10-12', name: 'Nossa Senhora Aparecida', type: HolidayType.NATIONAL },
+  { date: '2004-11-02', name: 'Finados', type: HolidayType.NATIONAL },
+  { date: '2004-11-15', name: 'Proclamação da República', type: HolidayType.NATIONAL },
+  { date: '2004-12-25', name: 'Natal', type: HolidayType.NATIONAL },
+  
+  // --- Amostra Passado Recente (ex: 2023) ---
+  { date: '2023-01-01', name: 'Confraternização Universal', type: HolidayType.NATIONAL },
+  { date: '2023-02-21', name: 'Carnaval (Ponto Facultativo Nacional)', type: HolidayType.NATIONAL },
+  { date: '2023-04-07', name: 'Sexta-feira Santa', type: HolidayType.NATIONAL },
+  { date: '2023-04-21', name: 'Tiradentes', type: HolidayType.NATIONAL },
+  { date: '2023-05-01', name: 'Dia do Trabalho', type: HolidayType.NATIONAL },
+  { date: '2023-06-08', name: 'Corpus Christi (Ponto Facultativo Nacional)', type: HolidayType.NATIONAL },
+  { date: '2023-09-07', name: 'Independência do Brasil', type: HolidayType.NATIONAL },
+  { date: '2023-10-12', name: 'Nossa Senhora Aparecida', type: HolidayType.NATIONAL },
+  { date: '2023-11-02', name: 'Finados', type: HolidayType.NATIONAL },
+  { date: '2023-11-15', name: 'Proclamação da República', type: HolidayType.NATIONAL },
+  { date: '2023-12-25', name: 'Natal', type: HolidayType.NATIONAL },
+
+  // --- Dados Existentes (2024, 2025, 2026) ---
   { date: '2024-01-01', name: 'Confraternização Universal', type: HolidayType.NATIONAL },
-  { date: '2024-03-29', name: 'Sexta-feira Santa', type: HolidayType.NATIONAL },
+  { date: '2024-03-29', name: 'Sexta-feira Santa', type: HolidayType.NATIONAL }, // Carnaval 2024: 13/02 (Ponto Facultativo)
+  { date: '2024-02-13', name: 'Carnaval (Ponto Facultativo Nacional)', type: HolidayType.NATIONAL },
   { date: '2024-04-21', name: 'Tiradentes', type: HolidayType.NATIONAL },
   { date: '2024-05-01', name: 'Dia do Trabalho', type: HolidayType.NATIONAL },
-  { date: '2024-05-30', name: 'Corpus Christi', type: HolidayType.NATIONAL },
+  { date: '2024-05-30', name: 'Corpus Christi (Ponto Facultativo Nacional)', type: HolidayType.NATIONAL },
   { date: '2024-09-07', name: 'Independência do Brasil', type: HolidayType.NATIONAL },
   { date: '2024-10-12', name: 'Nossa Senhora Aparecida', type: HolidayType.NATIONAL },
   { date: '2024-11-02', name: 'Finados', type: HolidayType.NATIONAL },
   { date: '2024-11-15', name: 'Proclamação da República', type: HolidayType.NATIONAL },
   { date: '2024-12-25', name: 'Natal', type: HolidayType.NATIONAL },
 
-  // 2025
   { date: '2025-01-01', name: 'Confraternização Universal', type: HolidayType.NATIONAL },
   { date: '2025-03-04', name: 'Carnaval (Ponto Facultativo Nacional)', type: HolidayType.NATIONAL },
   { date: '2025-04-18', name: 'Sexta-feira Santa', type: HolidayType.NATIONAL },
@@ -82,7 +110,6 @@ export const MOCK_NATIONAL_HOLIDAYS_PT_BR: Holiday[] = [
   { date: '2025-11-15', name: 'Proclamação da República', type: HolidayType.NATIONAL },
   { date: '2025-12-25', name: 'Natal', type: HolidayType.NATIONAL },
   
-  // 2026
   { date: '2026-01-01', name: 'Confraternização Universal', type: HolidayType.NATIONAL },
   { date: '2026-02-17', name: 'Carnaval (Ponto Facultativo Nacional)', type: HolidayType.NATIONAL },
   { date: '2026-04-03', name: 'Sexta-feira Santa', type: HolidayType.NATIONAL },
@@ -94,6 +121,32 @@ export const MOCK_NATIONAL_HOLIDAYS_PT_BR: Holiday[] = [
   { date: '2026-11-02', name: 'Finados', type: HolidayType.NATIONAL },
   { date: '2026-11-15', name: 'Proclamação da República', type: HolidayType.NATIONAL },
   { date: '2026-12-25', name: 'Natal', type: HolidayType.NATIONAL },
+
+  // --- Amostra Futuro Próximo (ex: 2027) ---
+  { date: '2027-01-01', name: 'Confraternização Universal', type: HolidayType.NATIONAL },
+  { date: '2027-02-09', name: 'Carnaval (Ponto Facultativo Nacional)', type: HolidayType.NATIONAL },
+  { date: '2027-03-26', name: 'Sexta-feira Santa', type: HolidayType.NATIONAL },
+  { date: '2027-04-21', name: 'Tiradentes', type: HolidayType.NATIONAL },
+  { date: '2027-05-01', name: 'Dia do Trabalho', type: HolidayType.NATIONAL },
+  { date: '2027-05-27', name: 'Corpus Christi (Ponto Facultativo Nacional)', type: HolidayType.NATIONAL },
+  { date: '2027-09-07', name: 'Independência do Brasil', type: HolidayType.NATIONAL },
+  { date: '2027-10-12', name: 'Nossa Senhora Aparecida', type: HolidayType.NATIONAL },
+  { date: '2027-11-02', name: 'Finados', type: HolidayType.NATIONAL },
+  { date: '2027-11-15', name: 'Proclamação da República', type: HolidayType.NATIONAL },
+  { date: '2027-12-25', name: 'Natal', type: HolidayType.NATIONAL },
+
+  // --- Amostra Futuro Distante (ex: 2044) ---
+  { date: '2044-01-01', name: 'Confraternização Universal', type: HolidayType.NATIONAL },
+  { date: '2044-02-16', name: 'Carnaval (Ponto Facultativo Nacional)', type: HolidayType.NATIONAL },
+  { date: '2044-04-01', name: 'Sexta-feira Santa', type: HolidayType.NATIONAL },
+  { date: '2044-04-21', name: 'Tiradentes', type: HolidayType.NATIONAL },
+  { date: '2044-05-01', name: 'Dia do Trabalho', type: HolidayType.NATIONAL },
+  { date: '2044-06-02', name: 'Corpus Christi (Ponto Facultativo Nacional)', type: HolidayType.NATIONAL },
+  { date: '2044-09-07', name: 'Independência do Brasil', type: HolidayType.NATIONAL },
+  { date: '2044-10-12', name: 'Nossa Senhora Aparecida', type: HolidayType.NATIONAL },
+  { date: '2044-11-02', name: 'Finados', type: HolidayType.NATIONAL },
+  { date: '2044-11-15', name: 'Proclamação da República', type: HolidayType.NATIONAL },
+  { date: '2044-12-25', name: 'Natal', type: HolidayType.NATIONAL },
 ];
 
 export const MOCK_SAINT_DAYS_PT_BR: Holiday[] = [
@@ -220,10 +273,67 @@ export const MOCK_SAINT_DAYS_PT_BR: Holiday[] = [
   { date: '12-29', name: 'São Tomás Becket, bispo e mártir', type: HolidayType.SAINT },
 ];
 
-// Commemorative dates will be fetched from API if not available for the year.
-// Example (if needed for initial testing, normally fetched):
-// { date: '2024-05-12', name: 'Dia das Mães', type: HolidayType.COMMEMORATIVE },
-export const MOCK_COMMEMORATIVE_DATES_PT_BR: Holiday[] = [];
+// TODO: Preencher completamente as datas comemorativas para o intervalo de [ano_atual - 20] até [ano_atual + 20].
+// Exemplo: Se o ano atual é 2024, preencher de 2004 até 2044.
+// Incluir datas como Dia das Mães, Dia dos Pais, etc. (excluindo feriados nacionais já listados).
+// Abaixo, uma amostra para ilustração com datas fixas comuns.
+export const MOCK_COMMEMORATIVE_DATES_PT_BR: Holiday[] = [
+  // --- Amostra 2004 ---
+  { date: '2004-03-08', name: 'Dia Internacional da Mulher', type: HolidayType.COMMEMORATIVE },
+  { date: '2004-05-09', name: 'Dia das Mães', type: HolidayType.COMMEMORATIVE }, // Exemplo Dia das Mães (2º Dom de Maio)
+  { date: '2004-06-12', name: 'Dia dos Namorados', type: HolidayType.COMMEMORATIVE },
+  { date: '2004-07-20', name: 'Dia do Amigo', type: HolidayType.COMMEMORATIVE },
+  { date: '2004-08-08', name: 'Dia dos Pais', type: HolidayType.COMMEMORATIVE }, // Exemplo Dia dos Pais (2º Dom de Agosto)
+  { date: '2004-10-12', name: 'Dia das Crianças', type: HolidayType.COMMEMORATIVE }, // Coincide com feriado, mas é comemorativa importante
+
+  // --- Amostra 2023 ---
+  { date: '2023-03-08', name: 'Dia Internacional da Mulher', type: HolidayType.COMMEMORATIVE },
+  { date: '2023-05-14', name: 'Dia das Mães', type: HolidayType.COMMEMORATIVE },
+  { date: '2023-06-12', name: 'Dia dos Namorados', type: HolidayType.COMMEMORATIVE },
+  { date: '2023-07-20', name: 'Dia do Amigo', type: HolidayType.COMMEMORATIVE },
+  { date: '2023-08-13', name: 'Dia dos Pais', type: HolidayType.COMMEMORATIVE },
+  { date: '2023-10-12', name: 'Dia das Crianças', type: HolidayType.COMMEMORATIVE },
+
+  // --- Amostra 2024 ---
+  { date: '2024-03-08', name: 'Dia Internacional da Mulher', type: HolidayType.COMMEMORATIVE },
+  { date: '2024-05-12', name: 'Dia das Mães', type: HolidayType.COMMEMORATIVE },
+  { date: '2024-06-12', name: 'Dia dos Namorados', type: HolidayType.COMMEMORATIVE },
+  { date: '2024-07-20', name: 'Dia do Amigo', type: HolidayType.COMMEMORATIVE },
+  { date: '2024-08-11', name: 'Dia dos Pais', type: HolidayType.COMMEMORATIVE },
+  { date: '2024-10-12', name: 'Dia das Crianças', type: HolidayType.COMMEMORATIVE },
+  
+  // --- Amostra 2025 ---
+  { date: '2025-03-08', name: 'Dia Internacional da Mulher', type: HolidayType.COMMEMORATIVE },
+  { date: '2025-05-11', name: 'Dia das Mães', type: HolidayType.COMMEMORATIVE },
+  { date: '2025-06-12', name: 'Dia dos Namorados', type: HolidayType.COMMEMORATIVE },
+  { date: '2025-07-20', name: 'Dia do Amigo', type: HolidayType.COMMEMORATIVE },
+  { date: '2025-08-10', name: 'Dia dos Pais', type: HolidayType.COMMEMORATIVE },
+  { date: '2025-10-12', name: 'Dia das Crianças', type: HolidayType.COMMEMORATIVE },
+
+  // --- Amostra 2026 ---
+  { date: '2026-03-08', name: 'Dia Internacional da Mulher', type: HolidayType.COMMEMORATIVE },
+  { date: '2026-05-10', name: 'Dia das Mães', type: HolidayType.COMMEMORATIVE },
+  { date: '2026-06-12', name: 'Dia dos Namorados', type: HolidayType.COMMEMORATIVE },
+  { date: '2026-07-20', name: 'Dia do Amigo', type: HolidayType.COMMEMORATIVE },
+  { date: '2026-08-09', name: 'Dia dos Pais', type: HolidayType.COMMEMORATIVE },
+  { date: '2026-10-12', name: 'Dia das Crianças', type: HolidayType.COMMEMORATIVE },
+
+  // --- Amostra 2027 ---
+  { date: '2027-03-08', name: 'Dia Internacional da Mulher', type: HolidayType.COMMEMORATIVE },
+  { date: '2027-05-09', name: 'Dia das Mães', type: HolidayType.COMMEMORATIVE },
+  { date: '2027-06-12', name: 'Dia dos Namorados', type: HolidayType.COMMEMORATIVE },
+  { date: '2027-07-20', name: 'Dia do Amigo', type: HolidayType.COMMEMORATIVE },
+  { date: '2027-08-08', name: 'Dia dos Pais', type: HolidayType.COMMEMORATIVE },
+  { date: '2027-10-12', name: 'Dia das Crianças', type: HolidayType.COMMEMORATIVE },
+
+  // --- Amostra 2044 ---
+  { date: '2044-03-08', name: 'Dia Internacional da Mulher', type: HolidayType.COMMEMORATIVE },
+  { date: '2044-05-08', name: 'Dia das Mães', type: HolidayType.COMMEMORATIVE },
+  { date: '2044-06-12', name: 'Dia dos Namorados', type: HolidayType.COMMEMORATIVE },
+  { date: '2044-07-20', name: 'Dia do Amigo', type: HolidayType.COMMEMORATIVE },
+  { date: '2044-08-14', name: 'Dia dos Pais', type: HolidayType.COMMEMORATIVE },
+  { date: '2044-10-12', name: 'Dia das Crianças', type: HolidayType.COMMEMORATIVE },
+];
 
 
 export const MOCK_ACTIVITIES: Activity[] = [];

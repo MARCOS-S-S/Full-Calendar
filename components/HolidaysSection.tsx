@@ -6,24 +6,13 @@ interface HolidaysSectionProps {
   holidays: Holiday[]; // Holidays for the current month
   monthName: string; // Already localized from App.tsx
   year: number;
-  isLoading: boolean;
+  // isLoading prop removed
 }
 
-const HolidaysSection: React.FC<HolidaysSectionProps> = ({ holidays, monthName, year, isLoading }) => {
+const HolidaysSection: React.FC<HolidaysSectionProps> = ({ holidays, monthName, year }) => {
   const sectionTitle = `Feriados Nacionais em ${monthName} de ${year}`;
 
-  if (isLoading) {
-    return (
-      <div className="mt-8 pt-6 border-t border-gray-200 dark:border-neutral-700">
-        <h3 className="text-sm font-semibold uppercase text-yellow-600 dark:text-yellow-500 mb-4 px-1 sm:px-0">
-          {sectionTitle}
-        </h3>
-        <div className="text-center py-8 text-gray-500 dark:text-neutral-400 bg-white dark:bg-neutral-800 rounded-lg shadow">
-          Carregando feriados...
-        </div>
-      </div>
-    );
-  }
+  // isLoading condition removed
   
   if (holidays.length === 0) {
     return (

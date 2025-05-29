@@ -6,24 +6,13 @@ interface CommemorativeDatesSectionProps {
   commemorativeDates: Holiday[];
   monthName: string;
   year: number;
-  isLoading: boolean;
+  // isLoading prop removed
 }
 
-const CommemorativeDatesSection: React.FC<CommemorativeDatesSectionProps> = ({ commemorativeDates, monthName, year, isLoading }) => {
+const CommemorativeDatesSection: React.FC<CommemorativeDatesSectionProps> = ({ commemorativeDates, monthName, year }) => {
   const sectionTitle = `Datas Comemorativas em ${monthName} de ${year}`;
 
-  if (isLoading) {
-    return (
-      <div className="mt-8 pt-6 border-t border-gray-200 dark:border-neutral-700">
-        <h3 className="text-sm font-semibold uppercase text-green-600 dark:text-green-400 mb-4 px-1 sm:px-0">
-          {sectionTitle}
-        </h3>
-        <div className="text-center py-8 text-gray-500 dark:text-neutral-400 bg-white dark:bg-neutral-800 rounded-lg shadow">
-          Carregando datas comemorativas...
-        </div>
-      </div>
-    );
-  }
+  // isLoading condition removed
 
   if (commemorativeDates.length === 0) {
     return (

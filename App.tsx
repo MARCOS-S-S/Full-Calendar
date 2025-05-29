@@ -16,7 +16,7 @@ import {
     MONTH_NAMES_PT, DAY_ABBREVIATIONS_PT, DAY_NAMES_PT, MOCK_SAINT_DAYS_PT_BR, MOCK_COMMEMORATIVE_DATES_PT_BR
 } from './constants';
 import { MenuIcon, CloseIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon } from './components/icons';
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+// GoogleGenAI import removed
 
 export interface CalendarFilterOptions {
   showHolidays: boolean;
@@ -26,18 +26,7 @@ export interface CalendarFilterOptions {
   showTasks: boolean;
 }
 
-// Initialize Gemini AI
-let ai: GoogleGenAI | null = null;
-if (process.env.API_KEY) {
-  try {
-    ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  } catch (error) {
-    console.error("Failed to initialize GoogleGenAI:", error);
-    // Handle API key issue, e.g., by disabling API-dependent features or showing a message.
-  }
-} else {
-  console.warn("API_KEY environment variable is not set. API-dependent features will be disabled.");
-}
+// GoogleGenAI (ai) instance and its initialization removed
 
 
 const App = (): JSX.Element => {
@@ -74,24 +63,12 @@ const App = (): JSX.Element => {
     return storedActivities ? JSON.parse(storedActivities) : MOCK_ACTIVITIES;
   });
 
-  const [nationalHolidays, setNationalHolidays] = useState<Holiday[]>(() => {
-    const stored = localStorage.getItem('calendarNationalHolidays');
-    // Ensure loaded data conforms to Holiday structure, especially the 'type'
-    const parsed = stored ? JSON.parse(stored) : MOCK_NATIONAL_HOLIDAYS_PT_BR;
-    return parsed.map((h: any) => ({ ...h, type: h.type || HolidayType.NATIONAL }));
-  });
-  const [commemorativeDates, setCommemorativeDates] = useState<Holiday[]>(() => {
-    const stored = localStorage.getItem('calendarCommemorativeDates');
-    // Ensure loaded data conforms to Holiday structure
-    const parsed = stored ? JSON.parse(stored) : MOCK_COMMEMORATIVE_DATES_PT_BR;
-    return parsed.map((cd: any) => ({ ...cd, type: cd.type || HolidayType.COMMEMORATIVE }));
-  });
+  // Initialize with pre-populated extensive data directly from constants
+  const [nationalHolidays, setNationalHolidays] = useState<Holiday[]>(MOCK_NATIONAL_HOLIDAYS_PT_BR);
+  const [commemorativeDates, setCommemorativeDates] = useState<Holiday[]>(MOCK_COMMEMORATIVE_DATES_PT_BR);
   const [saintDays, setSaintDays] = useState<Holiday[]>(MOCK_SAINT_DAYS_PT_BR);
 
-
-  const [isLoadingNationalHolidays, setIsLoadingNationalHolidays] = useState<boolean>(false);
-  const [isLoadingCommemorativeDates, setIsLoadingCommemorativeDates] = useState<boolean>(false);
-
+  // isLoading states and fetchedYears states removed
 
   const [filterOptions, setFilterOptions] = useState<CalendarFilterOptions>(() => {
     const storedFilters = localStorage.getItem('calendarFilterOptions');
@@ -117,89 +94,26 @@ const App = (): JSX.Element => {
   const sidebarToggleRef = useRef<HTMLButtonElement>(null);
 
 
-  useEffect(() => {
-    localStorage.setItem('calendarNationalHolidays', JSON.stringify(nationalHolidays));
-  }, [nationalHolidays]);
+  // Removed useEffect for saving nationalHolidays to localStorage
+  // Removed useEffect for saving commemorativeDates to localStorage
 
-  useEffect(() => {
-    localStorage.setItem('calendarCommemorativeDates', JSON.stringify(commemorativeDates));
-  }, [commemorativeDates]);
-
-  const fetchYearSpecificData = useCallback(async (year: number, type: 'national' | 'commemorative') => {
-    if (!ai) {
-      console.warn(`Gemini AI not initialized. Cannot fetch ${type} data for ${year}.`);
-      return;
-    }
-
-    const promptText = type === 'national'
-      ? `Forneça uma lista dos feriados nacionais do Brasil para o ano ${year} no formato JSON: [{ "date": "YYYY-MM-DD", "name": "Nome do Feriado" }]. Inclua apenas feriados oficiais e pontos facultativos nacionais reconhecidos federalmente. Não inclua feriados estaduais, municipais ou datas comemorativas comuns que não sejam feriados.`
-      : `Forneça uma lista das principais datas comemorativas do Brasil (não feriados) para o ano ${year} no formato JSON: [{ "date": "YYYY-MM-DD", "name": "Nome da Data Comemorativa" }]. Inclua datas como Dia das Mães, Dia dos Pais, Dia das Crianças, etc., mas exclua feriados nacionais. Ordene por data.`;
-
-    try {
-      if (type === 'national') setIsLoadingNationalHolidays(true);
-      if (type === 'commemorative') setIsLoadingCommemorativeDates(true);
-
-      const response: GenerateContentResponse = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-preview-04-17',
-        contents: promptText,
-        config: { responseMimeType: "application/json" },
-      });
-      
-      let jsonStr = response.text.trim();
-      const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
-      const match = jsonStr.match(fenceRegex);
-      if (match && match[2]) {
-        jsonStr = match[2].trim();
-      }
-
-      const rawParsedData: { date: string; name: string; }[] = JSON.parse(jsonStr);
-      
-      if (Array.isArray(rawParsedData)) {
-        const holidayTypeToAssign = type === 'national' ? HolidayType.NATIONAL : HolidayType.COMMEMORATIVE;
-        const typedData: Holiday[] = rawParsedData.map(item => ({
-          ...item,
-          type: holidayTypeToAssign,
-        }));
-
-        if (type === 'national') {
-          setNationalHolidays(prev => [...prev.filter(h => !h.date.startsWith(String(year))), ...typedData]);
-        } else {
-          setCommemorativeDates(prev => [...prev.filter(d => !d.date.startsWith(String(year))), ...typedData]);
-        }
-      } else {
-        console.error(`API response for ${type} ${year} is not an array:`, rawParsedData);
-      }
-
-    } catch (error) {
-      console.error(`Error fetching ${type} data for year ${year}:`, error);
-      // Optionally set an error state here to inform the user
-    } finally {
-      if (type === 'national') setIsLoadingNationalHolidays(false);
-      if (type === 'commemorative') setIsLoadingCommemorativeDates(false);
-    }
-  }, []);
-
-
-  useEffect(() => {
-    const yearStr = String(displayedYear);
-    const nationalHolidaysExistForYear = nationalHolidays.some(h => h.date.startsWith(yearStr));
-    const commemorativeDatesExistForYear = commemorativeDates.some(d => d.date.startsWith(yearStr));
-
-    if (!nationalHolidaysExistForYear && !isLoadingNationalHolidays) {
-      fetchYearSpecificData(displayedYear, 'national');
-    }
-    if (!commemorativeDatesExistForYear && !isLoadingCommemorativeDates) {
-      fetchYearSpecificData(displayedYear, 'commemorative');
-    }
-  }, [displayedYear, nationalHolidays, commemorativeDates, fetchYearSpecificData, isLoadingNationalHolidays, isLoadingCommemorativeDates]);
-
+  // fetchYearSpecificData function removed
+  // useEffect for fetching year-specific data removed
 
   useEffect(() => {
     const htmlElement = document.documentElement;
+    const themeColorMetaTag = document.getElementById('theme-color-meta') as HTMLMetaElement | null;
+
     if (theme === Theme.DARK) {
       htmlElement.classList.add('dark');
+      if (themeColorMetaTag) {
+        themeColorMetaTag.content = '#000000'; 
+      }
     } else {
       htmlElement.classList.remove('dark');
+      if (themeColorMetaTag) {
+        themeColorMetaTag.content = '#f8fafc'; 
+      }
     }
   }, [theme]);
 
@@ -237,7 +151,7 @@ const App = (): JSX.Element => {
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
-      if (!localStorage.getItem('calendarTheme')) {
+      if (!localStorage.getItem('calendarTheme')) { 
         setTheme(e.matches ? Theme.DARK : Theme.LIGHT);
       }
     };
@@ -384,7 +298,7 @@ const App = (): JSX.Element => {
     activities.forEach(act => {
       const isVisibleEvent = filterOptions.showEvents && act.activityType === ActivityType.EVENT;
       const isVisibleTask = filterOptions.showTasks && act.activityType === ActivityType.TASK;
-      const isVisibleBirthday = act.activityType === ActivityType.BIRTHDAY; // Birthdays always shown if activities are generally visible
+      const isVisibleBirthday = act.activityType === ActivityType.BIRTHDAY; 
       
       if (isVisibleEvent || isVisibleTask || isVisibleBirthday) {
         if (!mapping[act.date]) {
@@ -400,35 +314,27 @@ const App = (): JSX.Element => {
     const mapping: Record<string, Holiday> = {};
     const yearStr = String(displayedYear);
 
-    // Apply Saint Days first (lowest priority)
     if (filterOptions.showSaintDays) {
       saintDays.forEach(sd => {
-        const [saintMonthStr, saintDayStr] = sd.date.split('-'); // MM-DD format
+        const [saintMonthStr, saintDayStr] = sd.date.split('-'); 
         const dateStr = `${yearStr}-${saintMonthStr}-${saintDayStr}`;
-        // Saint days from MOCK_SAINT_DAYS_PT_BR already have type: HolidayType.SAINT
-        if (!mapping[dateStr]) { // Only add if no higher priority item has set this date
-             mapping[dateStr] = { ...sd, date: dateStr }; // Ensure date is YYYY-MM-DD
+        if (!mapping[dateStr]) { 
+             mapping[dateStr] = { ...sd, date: dateStr }; 
         }
       });
     }
     
-    // Apply Commemorative Dates (medium priority)
     if (filterOptions.showCommemorativeDates) {
       commemorativeDates.forEach(cd => {
-        // Ensure it's for the current year and has the correct type
         if (cd.date.startsWith(yearStr) && cd.type === HolidayType.COMMEMORATIVE) {
-          // Overwrites Saint Day if present
           mapping[cd.date] = cd;
         }
       });
     }
 
-    // Apply National Holidays (highest priority)
     if (filterOptions.showHolidays) {
       nationalHolidays.forEach(hol => {
-        // Ensure it's for the current year and has the correct type
         if (hol.date.startsWith(yearStr) && hol.type === HolidayType.NATIONAL) {
-          // Overwrites Commemorative or Saint Day if present
           mapping[hol.date] = hol;
         }
       });
@@ -475,13 +381,12 @@ const App = (): JSX.Element => {
       .filter(sd => {
         const [saintMonthStr] = sd.date.split('-'); 
         const saintMonth = parseInt(saintMonthStr, 10);
-        // Ensure it's a Saint Day type
         return sd.type === HolidayType.SAINT && (saintMonth - 1) === displayedMonth;
       })
       .map(sd => ({
         date: `${displayedYear}-${sd.date}`, 
         name: sd.name,
-        type: HolidayType.SAINT, // Explicitly carry over the type
+        type: HolidayType.SAINT, 
       }))
       .sort((a, b) => {
         const dayA = parseInt(a.date.split('-')[2], 10);
@@ -576,7 +481,7 @@ const App = (): JSX.Element => {
                   monthIndex={displayedMonth}
                   selectedDate={selectedDate}
                   onDateSelect={handleDateSelect}
-                  eventsByDate={eventsByDate} // Pass count of events
+                  eventsByDate={eventsByDate} 
                   holidaysByDate={holidaysByDate} 
                   localizedDayAbbreviations={localizedDayAbbreviations}
                   localizedDayFullNames={localizedDayFullNames}
@@ -588,7 +493,6 @@ const App = (): JSX.Element => {
                 activities={activities.filter(act => {
                   if (act.activityType === ActivityType.EVENT && !filterOptions.showEvents) return false;
                   if (act.activityType === ActivityType.TASK && !filterOptions.showTasks) return false;
-                  // Birthdays are always shown if activities are generally visible, filtering is handled in eventsByDate
                   return true; 
                 })}
                 onAddActivity={handleOpenCreateModal}
@@ -601,7 +505,7 @@ const App = (): JSX.Element => {
                     holidays={holidaysForCurrentMonth}
                     monthName={localizedMonthNames[displayedMonth]}
                     year={displayedYear}
-                    isLoading={isLoadingNationalHolidays && nationalHolidays.filter(h => h.date.startsWith(String(displayedYear)) && new Date(h.date + 'T00:00:00').getMonth() === displayedMonth).length === 0}
+                    // isLoading prop removed
                   />
               )}
               
@@ -610,7 +514,7 @@ const App = (): JSX.Element => {
                   commemorativeDates={commemorativeDatesForCurrentMonth}
                   monthName={localizedMonthNames[displayedMonth]}
                   year={displayedYear}
-                  isLoading={isLoadingCommemorativeDates && commemorativeDates.filter(cd => cd.date.startsWith(String(displayedYear)) && new Date(cd.date + 'T00:00:00').getMonth() === displayedMonth).length === 0}
+                  // isLoading prop removed
                 />
               )}
 
@@ -672,7 +576,7 @@ const App = (): JSX.Element => {
                               handleDateSelect(date); 
                               setViewMode(ViewMode.MONTHLY);
                           }}
-                          eventsByDate={eventsByDate} // Pass count of events
+                          eventsByDate={eventsByDate} 
                           holidaysByDate={holidaysByDate}
                           localizedDayAbbreviations={localizedDayAbbreviations}
                           localizedDayFullNames={localizedDayFullNames}
