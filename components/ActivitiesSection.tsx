@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Activity } from '../constants';
 import ActivityItem from './ActivityItem';
@@ -10,7 +9,6 @@ interface ActivitiesSectionProps {
   onAddActivity: () => void;
   onEditActivity: (activity: Activity) => void;
   onDeleteActivityRequest: (activityId: string) => void;
-  // t and language props removed
 }
 
 const ActivitiesSection: React.FC<ActivitiesSectionProps> = ({
@@ -21,7 +19,7 @@ const ActivitiesSection: React.FC<ActivitiesSectionProps> = ({
   onDeleteActivityRequest,
 }) => {
   const today = new Date();
-  today.setHours(0,0,0,0);
+  today.setHours(0, 0, 0, 0);
 
   const isSelectedDateToday =
     selectedDate.getFullYear() === today.getFullYear() &&
@@ -35,7 +33,7 @@ const ActivitiesSection: React.FC<ActivitiesSectionProps> = ({
   const filteredActivities = activities.filter(act => {
     const actDateParts = act.date.split('-');
     const actDate = new Date(parseInt(actDateParts[0]), parseInt(actDateParts[1]) - 1, parseInt(actDateParts[2]));
-    actDate.setHours(0,0,0,0);
+    actDate.setHours(0, 0, 0, 0);
     return actDate.getTime() === selectedDate.getTime();
   });
 
@@ -74,9 +72,8 @@ const ActivitiesSection: React.FC<ActivitiesSectionProps> = ({
           ))}
         </div>
       ) : (
-         <div className="text-center py-8 text-gray-500 dark:text-neutral-400 bg-white dark:bg-neutral-800 rounded-lg shadow">
-            Nenhuma atividade agendada para este dia.
-        </div>
+        // A "caixa de diálogo" foi removida substituindo o JSX anterior por null
+        null
       )}
     </div>
   );

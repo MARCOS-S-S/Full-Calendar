@@ -6,17 +6,16 @@ import CalendarNavHeader from './components/CalendarNavHeader';
 import ActivitiesSection from './components/ActivitiesSection';
 import HolidaysSection from './components/HolidaysSection';
 import SaintDaysSection from './components/SaintDaysSection';
-import CommemorativeDatesSection from './components/CommemorativeDatesSection'; // Import new component
+import CommemorativeDatesSection from './components/CommemorativeDatesSection';
 import CreateActivityModal from './components/CreateActivityModal';
 import ConfirmDeleteModal from './components/ConfirmDeleteModal';
 import SettingsModal from './components/SettingsModal';
 import WelcomeHeader from './components/WelcomeHeader';
 import {
-    ViewMode, Theme, Activity, Holiday, MOCK_NATIONAL_HOLIDAYS_PT_BR, MOCK_ACTIVITIES, ActivityType, HolidayType,
-    MONTH_NAMES_PT, DAY_ABBREVIATIONS_PT, DAY_NAMES_PT, MOCK_SAINT_DAYS_PT_BR, MOCK_COMMEMORATIVE_DATES_PT_BR
+  ViewMode, Theme, Activity, Holiday, MOCK_NATIONAL_HOLIDAYS_PT_BR, MOCK_ACTIVITIES, ActivityType, HolidayType,
+  MONTH_NAMES_PT, DAY_ABBREVIATIONS_PT, DAY_NAMES_PT, MOCK_SAINT_DAYS_PT_BR, MOCK_COMMEMORATIVE_DATES_PT_BR
 } from './constants';
 import { MenuIcon, CloseIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon } from './components/icons';
-// GoogleGenAI import removed
 
 export interface CalendarFilterOptions {
   showHolidays: boolean;
@@ -26,16 +25,13 @@ export interface CalendarFilterOptions {
   showTasks: boolean;
 }
 
-// GoogleGenAI (ai) instance and its initialization removed
-
-
 const App = (): JSX.Element => {
   const localizedMonthNames = MONTH_NAMES_PT;
   const localizedDayAbbreviations = DAY_ABBREVIATIONS_PT;
   const localizedDayFullNames = DAY_NAMES_PT;
 
   const today = new Date();
-  today.setHours(0,0,0,0);
+  today.setHours(0, 0, 0, 0);
 
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.MONTHLY);
   const [displayedYear, setDisplayedYear] = useState<number>(today.getFullYear());
@@ -53,7 +49,7 @@ const App = (): JSX.Element => {
     }
     return Theme.LIGHT;
   });
-  
+
   const [username, setUsername] = useState<string>(() => {
     return localStorage.getItem('calendarUsername') || '';
   });
@@ -63,12 +59,9 @@ const App = (): JSX.Element => {
     return storedActivities ? JSON.parse(storedActivities) : MOCK_ACTIVITIES;
   });
 
-  // Initialize with pre-populated extensive data directly from constants
   const [nationalHolidays, setNationalHolidays] = useState<Holiday[]>(MOCK_NATIONAL_HOLIDAYS_PT_BR);
   const [commemorativeDates, setCommemorativeDates] = useState<Holiday[]>(MOCK_COMMEMORATIVE_DATES_PT_BR);
   const [saintDays, setSaintDays] = useState<Holiday[]>(MOCK_SAINT_DAYS_PT_BR);
-
-  // isLoading states and fetchedYears states removed
 
   const [filterOptions, setFilterOptions] = useState<CalendarFilterOptions>(() => {
     const storedFilters = localStorage.getItem('calendarFilterOptions');
@@ -93,13 +86,6 @@ const App = (): JSX.Element => {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const sidebarToggleRef = useRef<HTMLButtonElement>(null);
 
-
-  // Removed useEffect for saving nationalHolidays to localStorage
-  // Removed useEffect for saving commemorativeDates to localStorage
-
-  // fetchYearSpecificData function removed
-  // useEffect for fetching year-specific data removed
-
   useEffect(() => {
     const htmlElement = document.documentElement;
     const themeColorMetaTag = document.getElementById('theme-color-meta') as HTMLMetaElement | null;
@@ -107,12 +93,12 @@ const App = (): JSX.Element => {
     if (theme === Theme.DARK) {
       htmlElement.classList.add('dark');
       if (themeColorMetaTag) {
-        themeColorMetaTag.content = '#000000'; 
+        themeColorMetaTag.content = '#000000';
       }
     } else {
       htmlElement.classList.remove('dark');
       if (themeColorMetaTag) {
-        themeColorMetaTag.content = '#f8fafc'; 
+        themeColorMetaTag.content = '#f8fafc';
       }
     }
   }, [theme]);
@@ -128,11 +114,11 @@ const App = (): JSX.Element => {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (isSidebarOpen &&
-          sidebarRef.current &&
-          !sidebarRef.current.contains(event.target as Node) &&
-          sidebarToggleRef.current && 
-          !sidebarToggleRef.current.contains(event.target as Node) 
-          ) {
+        sidebarRef.current &&
+        !sidebarRef.current.contains(event.target as Node) &&
+        sidebarToggleRef.current &&
+        !sidebarToggleRef.current.contains(event.target as Node)
+      ) {
         setIsSidebarOpen(false);
       }
     };
@@ -151,7 +137,7 @@ const App = (): JSX.Element => {
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
-      if (!localStorage.getItem('calendarTheme')) { 
+      if (!localStorage.getItem('calendarTheme')) {
         setTheme(e.matches ? Theme.DARK : Theme.LIGHT);
       }
     };
@@ -159,7 +145,6 @@ const App = (): JSX.Element => {
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
-
 
   const handleThemeChange = (newTheme: Theme) => {
     setTheme(newTheme);
@@ -192,8 +177,8 @@ const App = (): JSX.Element => {
     } else {
       setSelectedDate(date);
       if (date.getFullYear() !== displayedYear || date.getMonth() !== displayedMonth) {
-          setDisplayedYear(date.getFullYear());
-          setDisplayedMonth(date.getMonth());
+        setDisplayedYear(date.getFullYear());
+        setDisplayedMonth(date.getMonth());
       }
     }
   };
@@ -220,25 +205,25 @@ const App = (): JSX.Element => {
     if (activityData.id) {
       setActivities(prevActivities =>
         prevActivities.map(act => act.id === activityData.id ? { ...act, ...activityData } as Activity : act)
-        .sort((a,b) => {
+          .sort((a, b) => {
             const aTime = a.isAllDay ? "00:00" : a.startTime || "00:00";
             const bTime = b.isAllDay ? "00:00" : b.startTime || "00:00";
             if (a.isAllDay && !b.isAllDay) return -1;
             if (!a.isAllDay && b.isAllDay) return 1;
             return aTime.localeCompare(bTime);
-        })
+          })
       );
     } else {
       const newActivity: Activity = {
         ...activityData,
         id: String(Date.now() + Math.random()),
-      } as Activity; 
-      setActivities(prevActivities => [...prevActivities, newActivity].sort((a,b) => {
-          const aTime = a.isAllDay ? "00:00" : a.startTime || "00:00";
-          const bTime = b.isAllDay ? "00:00" : b.startTime || "00:00";
-          if (a.isAllDay && !b.isAllDay) return -1;
-          if (!a.isAllDay && b.isAllDay) return 1;
-          return aTime.localeCompare(bTime);
+      } as Activity;
+      setActivities(prevActivities => [...prevActivities, newActivity].sort((a, b) => {
+        const aTime = a.isAllDay ? "00:00" : a.startTime || "00:00";
+        const bTime = b.isAllDay ? "00:00" : b.startTime || "00:00";
+        if (a.isAllDay && !b.isAllDay) return -1;
+        if (!a.isAllDay && b.isAllDay) return 1;
+        return aTime.localeCompare(bTime);
       }));
     }
     setIsCreateModalOpen(false);
@@ -280,7 +265,7 @@ const App = (): JSX.Element => {
 
   const handleSaveSettings = (newConfig: { theme?: Theme; username?: string }) => {
     if (newConfig.theme && newConfig.theme !== theme) {
-        handleThemeChange(newConfig.theme);
+      handleThemeChange(newConfig.theme);
     }
     if (newConfig.username !== undefined) {
       setUsername(newConfig.username);
@@ -298,8 +283,8 @@ const App = (): JSX.Element => {
     activities.forEach(act => {
       const isVisibleEvent = filterOptions.showEvents && act.activityType === ActivityType.EVENT;
       const isVisibleTask = filterOptions.showTasks && act.activityType === ActivityType.TASK;
-      const isVisibleBirthday = act.activityType === ActivityType.BIRTHDAY; 
-      
+      const isVisibleBirthday = act.activityType === ActivityType.BIRTHDAY;
+
       if (isVisibleEvent || isVisibleTask || isVisibleBirthday) {
         if (!mapping[act.date]) {
           mapping[act.date] = 0;
@@ -316,14 +301,14 @@ const App = (): JSX.Element => {
 
     if (filterOptions.showSaintDays) {
       saintDays.forEach(sd => {
-        const [saintMonthStr, saintDayStr] = sd.date.split('-'); 
+        const [saintMonthStr, saintDayStr] = sd.date.split('-');
         const dateStr = `${yearStr}-${saintMonthStr}-${saintDayStr}`;
-        if (!mapping[dateStr]) { 
-             mapping[dateStr] = { ...sd, date: dateStr }; 
+        if (!mapping[dateStr]) {
+          mapping[dateStr] = { ...sd, date: dateStr };
         }
       });
     }
-    
+
     if (filterOptions.showCommemorativeDates) {
       commemorativeDates.forEach(cd => {
         if (cd.date.startsWith(yearStr) && cd.type === HolidayType.COMMEMORATIVE) {
@@ -341,52 +326,51 @@ const App = (): JSX.Element => {
     }
     return mapping;
   }, [
-      displayedYear, 
-      nationalHolidays, 
-      saintDays, 
-      commemorativeDates, 
-      filterOptions.showHolidays, 
-      filterOptions.showSaintDays, 
-      filterOptions.showCommemorativeDates
-    ]);
+    displayedYear,
+    nationalHolidays,
+    saintDays,
+    commemorativeDates,
+    filterOptions.showHolidays,
+    filterOptions.showSaintDays,
+    filterOptions.showCommemorativeDates
+  ]);
 
   const holidaysForCurrentMonth = useMemo(() => {
     if (!filterOptions.showHolidays) return [];
     return nationalHolidays.filter(holiday => {
-      const holidayDate = new Date(holiday.date + 'T00:00:00'); 
+      const holidayDate = new Date(holiday.date + 'T00:00:00');
       return holiday.type === HolidayType.NATIONAL && holidayDate.getFullYear() === displayedYear && holidayDate.getMonth() === displayedMonth;
     }).sort((a, b) => {
-        const dayA = parseInt(a.date.split('-')[2], 10);
-        const dayB = parseInt(b.date.split('-')[2], 10);
-        return dayA - dayB;
-      });
+      const dayA = parseInt(a.date.split('-')[2], 10);
+      const dayB = parseInt(b.date.split('-')[2], 10);
+      return dayA - dayB;
+    });
   }, [nationalHolidays, displayedYear, displayedMonth, filterOptions.showHolidays]);
 
   const commemorativeDatesForCurrentMonth = useMemo(() => {
     if (!filterOptions.showCommemorativeDates) return [];
     return commemorativeDates.filter(cd => {
-        const cdDate = new Date(cd.date + 'T00:00:00');
-        return cd.type === HolidayType.COMMEMORATIVE && cdDate.getFullYear() === displayedYear && cdDate.getMonth() === displayedMonth;
-    }).sort((a,b) => {
-        const dayA = parseInt(a.date.split('-')[2], 10);
-        const dayB = parseInt(b.date.split('-')[2], 10);
-        return dayA - dayB;
+      const cdDate = new Date(cd.date + 'T00:00:00');
+      return cd.type === HolidayType.COMMEMORATIVE && cdDate.getFullYear() === displayedYear && cdDate.getMonth() === displayedMonth;
+    }).sort((a, b) => {
+      const dayA = parseInt(a.date.split('-')[2], 10);
+      const dayB = parseInt(b.date.split('-')[2], 10);
+      return dayA - dayB;
     });
   }, [commemorativeDates, displayedYear, displayedMonth, filterOptions.showCommemorativeDates]);
-
 
   const saintDaysForCurrentMonth = useMemo(() => {
     if (!filterOptions.showSaintDays) return [];
     return saintDays
       .filter(sd => {
-        const [saintMonthStr] = sd.date.split('-'); 
+        const [saintMonthStr] = sd.date.split('-');
         const saintMonth = parseInt(saintMonthStr, 10);
         return sd.type === HolidayType.SAINT && (saintMonth - 1) === displayedMonth;
       })
       .map(sd => ({
-        date: `${displayedYear}-${sd.date}`, 
+        date: `${displayedYear}-${sd.date}`,
         name: sd.name,
-        type: HolidayType.SAINT, 
+        type: HolidayType.SAINT,
       }))
       .sort((a, b) => {
         const dayA = parseInt(a.date.split('-')[2], 10);
@@ -395,37 +379,16 @@ const App = (): JSX.Element => {
       });
   }, [saintDays, displayedYear, displayedMonth, filterOptions.showSaintDays]);
 
-
-  const mainContentActualPaddingTop = `pt-4`;
-
-
   return (
     <div className={`flex h-full font-sans antialiased overflow-hidden ${theme === Theme.DARK ? 'dark' : ''}`}>
-      
-      <button
-        ref={sidebarToggleRef}
-        onClick={toggleSidebar} 
-        className={`fixed z-50 p-2 rounded-md h-10 w-10 items-center justify-center
-                    ${theme === Theme.LIGHT ? 'text-rose-500 hover:bg-rose-50' : 'text-sky-400 hover:bg-sky-500/20'}
-                    transition-all duration-300 ${isSidebarOpen ? 'hidden' : 'flex'}`}
-        style={{
-          top: `calc(env(safe-area-inset-top, 0px) + 0.75rem)`,
-          right: `calc(env(safe-area-inset-right, 0px) + 0.75rem)`
-        }}
-        aria-label="Abrir menu lateral"
-        aria-expanded={isSidebarOpen}
-        aria-controls="sidebar"
-        hidden={isSidebarOpen}
-      >
-        <MenuIcon className="w-6 h-6" />
-      </button>
 
+      {/* Sidebar (permanece com posicionamento fixo/transform) */}
       <div
         ref={sidebarRef}
         id="sidebar"
         className={`fixed z-20 transform transition-transform duration-300 ease-in-out 
-                   ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'} 
-                   w-64 shadow-lg`}
+                  ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'} 
+                  w-64 shadow-lg`}
         style={{
           top: 'env(safe-area-inset-top, 0px)',
           bottom: 'env(safe-area-inset-bottom, 0px)',
@@ -440,39 +403,67 @@ const App = (): JSX.Element => {
           currentTheme={theme}
           onThemeChange={(newTheme) => { handleThemeChange(newTheme); }}
           onOpenSettingsModal={(category) => { handleOpenSettingsModal(category); }}
-          onRequestClose={toggleSidebar} 
+          onRequestClose={toggleSidebar}
         />
       </div>
 
+      {/* Conteúdo Principal que rola */}
       <main
-        className={`relative flex-grow transition-all duration-300 ease-in-out h-full overflow-y-auto 
-                   ${isSidebarOpen ? 'blur-sm pointer-events-none' : ''}
-                   ${theme === Theme.DARK ? 'bg-black text-white' : 'bg-slate-50 text-gray-900'}`}
+        className={`relative flex-grow transition-all duration-300 ease-in-out h-full overflow-y-scroll 
+                  ${isSidebarOpen ? 'blur-sm pointer-events-none' : ''}
+                  ${theme === Theme.DARK ? 'bg-black text-white' : 'bg-slate-50 text-gray-900'}`}
         style={{
-          paddingTop: 'env(safe-area-inset-top, 0px)',
           paddingLeft: 'env(safe-area-inset-left, 0px)',
           paddingRight: 'env(safe-area-inset-right, 0px)',
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         }}
       >
-        <div className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 ${mainContentActualPaddingTop} pb-8`}>
-          {username && (
-            <WelcomeHeader
-              username={username}
-              theme={theme}
-              className="mb-6" 
-            />
-          )}
+        {/* Cabeçalho Combinado: Mensagem de Boas-vindas e Botão do Sidebar */}
+        <div
+          className="flex justify-between items-center w-full px-3 sm:px-4 lg:px-6 mb-6"
+          style={{
+            paddingTop: `calc(env(safe-area-inset-top, 0px) + 0.75rem)`,
+          }}
+        >
+          {/* Wrapper da Mensagem de Boas-vindas - ocupa o espaço disponível */}
+          <div className="flex-grow min-w-0 pr-4">
+            {username && (
+              <WelcomeHeader
+                username={username}
+                theme={theme}
+              />
+            )}
+          </div>
+
+          {/* Botão de Alternância do Sidebar - largura fixa, não encolhe */}
+          <button
+            ref={sidebarToggleRef}
+            onClick={toggleSidebar}
+            className={`p-2 rounded-md h-10 w-10 flex items-center justify-center flex-shrink-0
+                        ${theme === Theme.LIGHT ? 'text-rose-500 hover:bg-rose-50' : 'text-sky-400 hover:bg-sky-500/20'}
+                        transition-all duration-300 ${isSidebarOpen ? 'hidden' : ''}`}
+            aria-label="Abrir menu lateral"
+            aria-expanded={isSidebarOpen}
+            aria-controls="sidebar"
+            hidden={isSidebarOpen}
+          >
+            <MenuIcon className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* Conteúdo principal abaixo do cabeçalho combinado */}
+        <div className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-8`}>
+          {/* WelcomeHeader foi movido para cima */}
 
           {viewMode === ViewMode.MONTHLY && (
-            <div className="max-w-3xl mx-auto"> 
+            <div className="max-w-3xl mx-auto">
               <CalendarNavHeader
-                  displayedMonth={displayedMonth}
-                  displayedYear={displayedYear}
-                  onPreviousMonth={handlePreviousMonth}
-                  onNextMonth={handleNextMonth}
-                  localizedMonthNames={localizedMonthNames}
-                  currentTheme={theme}
+                displayedMonth={displayedMonth}
+                displayedYear={displayedYear}
+                onPreviousMonth={handlePreviousMonth}
+                onNextMonth={handleNextMonth}
+                localizedMonthNames={localizedMonthNames}
+                currentTheme={theme}
               />
 
               <div className="my-6">
@@ -481,8 +472,8 @@ const App = (): JSX.Element => {
                   monthIndex={displayedMonth}
                   selectedDate={selectedDate}
                   onDateSelect={handleDateSelect}
-                  eventsByDate={eventsByDate} 
-                  holidaysByDate={holidaysByDate} 
+                  eventsByDate={eventsByDate}
+                  holidaysByDate={holidaysByDate}
                   localizedDayAbbreviations={localizedDayAbbreviations}
                   localizedDayFullNames={localizedDayFullNames}
                 />
@@ -493,7 +484,7 @@ const App = (): JSX.Element => {
                 activities={activities.filter(act => {
                   if (act.activityType === ActivityType.EVENT && !filterOptions.showEvents) return false;
                   if (act.activityType === ActivityType.TASK && !filterOptions.showTasks) return false;
-                  return true; 
+                  return true;
                 })}
                 onAddActivity={handleOpenCreateModal}
                 onEditActivity={handleEditActivity}
@@ -501,20 +492,18 @@ const App = (): JSX.Element => {
               />
 
               {filterOptions.showHolidays && (
-                  <HolidaysSection
-                    holidays={holidaysForCurrentMonth}
-                    monthName={localizedMonthNames[displayedMonth]}
-                    year={displayedYear}
-                    // isLoading prop removed
-                  />
+                <HolidaysSection
+                  holidays={holidaysForCurrentMonth}
+                  monthName={localizedMonthNames[displayedMonth]}
+                  year={displayedYear}
+                />
               )}
-              
+
               {filterOptions.showCommemorativeDates && (
                 <CommemorativeDatesSection
                   commemorativeDates={commemorativeDatesForCurrentMonth}
                   monthName={localizedMonthNames[displayedMonth]}
                   year={displayedYear}
-                  // isLoading prop removed
                 />
               )}
 
@@ -529,33 +518,33 @@ const App = (): JSX.Element => {
           )}
 
           {viewMode === ViewMode.YEARLY && (
-            <div> 
+            <div>
               <h1 className="text-3xl font-bold text-center mb-10 text-gray-800 dark:text-neutral-100">
                 Calendário Interativo <span className="text-rose-500 dark:text-sky-400">{displayedYear}</span>
               </h1>
               <div className="flex justify-center items-center mb-10 space-x-4">
-                  <button
-                      onClick={() => setDisplayedYear(y => y - 1)}
-                      className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-neutral-700 text-rose-500 dark:text-rose-400"
-                      aria-label={`Ano anterior, ${displayedYear -1}`}
-                  >
-                      <ChevronLeftIcon className="w-7 h-7" />
-                  </button>
-                  <button
-                      onClick={() => setDisplayedYear(today.getFullYear())}
-                      className={`px-4 py-2 text-sm font-medium rounded-md 
-                                  ${theme === Theme.DARK ? 'bg-neutral-700 hover:bg-neutral-600 text-neutral-100' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
-                      aria-label="Ir para o ano atual"
-                  >
-                      Ano Atual
-                  </button>
-                  <button
-                      onClick={() => setDisplayedYear(y => y + 1)}
-                      className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-neutral-700 text-rose-500 dark:text-rose-400"
-                      aria-label={`Próximo ano, ${displayedYear + 1}`}
-                  >
-                      <ChevronRightIcon className="w-7 h-7" />
-                  </button>
+                <button
+                  onClick={() => setDisplayedYear(y => y - 1)}
+                  className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-neutral-700 text-rose-500 dark:text-rose-400"
+                  aria-label={`Ano anterior, ${displayedYear - 1}`}
+                >
+                  <ChevronLeftIcon className="w-7 h-7" />
+                </button>
+                <button
+                  onClick={() => setDisplayedYear(today.getFullYear())}
+                  className={`px-4 py-2 text-sm font-medium rounded-md 
+                                ${theme === Theme.DARK ? 'bg-neutral-700 hover:bg-neutral-600 text-neutral-100' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
+                  aria-label="Ir para o ano atual"
+                >
+                  Ano Atual
+                </button>
+                <button
+                  onClick={() => setDisplayedYear(y => y + 1)}
+                  className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-neutral-700 text-rose-500 dark:text-rose-400"
+                  aria-label={`Próximo ano, ${displayedYear + 1}`}
+                >
+                  <ChevronRightIcon className="w-7 h-7" />
+                </button>
               </div>
               {[displayedYear].map(year => (
                 <section key={year} className="mb-16">
@@ -573,10 +562,10 @@ const App = (): JSX.Element => {
                           monthIndex={monthIdx}
                           selectedDate={selectedDate}
                           onDateSelect={(date) => {
-                              handleDateSelect(date); 
-                              setViewMode(ViewMode.MONTHLY);
+                            handleDateSelect(date);
+                            setViewMode(ViewMode.MONTHLY);
                           }}
-                          eventsByDate={eventsByDate} 
+                          eventsByDate={eventsByDate}
                           holidaysByDate={holidaysByDate}
                           localizedDayAbbreviations={localizedDayAbbreviations}
                           localizedDayFullNames={localizedDayFullNames}
@@ -610,7 +599,7 @@ const App = (): JSX.Element => {
           onClose={handleCloseSettingsModal}
           onSave={handleSaveSettings}
           currentTheme={theme}
-          currentUsername={username} 
+          currentUsername={username}
           categoryName={currentSettingsCategory}
         />
       </main>
