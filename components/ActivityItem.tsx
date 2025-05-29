@@ -1,16 +1,39 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Activity } from '../constants';
+import { Activity, Theme } from '../constants'; // Added Theme
 import { ClockIcon, MoreVerticalIcon, PencilIcon, TrashIcon } from './icons';
 
 interface ActivityItemProps {
   activity: Activity;
   onEdit: (activity: Activity) => void;
   onDeleteRequest: (activityId: string) => void;
-  // t prop removed
+  index: number;
+  isDragging: boolean;
+  isDragOver: boolean;
+  handleDragStart: (index: number) => void;
+  handleDragEnter: (index: number, event: React.DragEvent<HTMLDivElement>) => void;
+  handleDragOverEvents: (event: React.DragEvent<HTMLDivElement>) => void;
+  handleDrop: (droppedOnIndex: number) => void;
+  handleDragEnd: () => void;
+  handleDragLeave: () => void;
+  currentTheme: Theme;
 }
 
-const ActivityItem: React.FC<ActivityItemProps> = ({ activity, onEdit, onDeleteRequest }) => {
+const ActivityItem: React.FC<ActivityItemProps> = ({
+  activity,
+  onEdit,
+  onDeleteRequest,
+  index,
+  isDragging,
+  isDragOver,
+  handleDragStart,
+  handleDragEnter,
+  handleDragOverEvents,
+  handleDrop,
+  handleDragEnd,
+  handleDragLeave,
+  currentTheme
+}) => {
   const displayTime = activity.isAllDay ? "Dia inteiro" : activity.startTime;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -27,8 +50,34 @@ const ActivityItem: React.FC<ActivityItemProps> = ({ activity, onEdit, onDeleteR
     };
   }, []);
 
+  const dragOverRingClass = isDragOver
+    ? (currentTheme === Theme.DARK ? 'ring-2 ring-sky-500 ring-offset-2 ring-offset-black' : 'ring-2 ring-rose-500 ring-offset-2 ring-offset-slate-50')
+    : '';
+
+  const draggingStyles = isDragging
+    ? 'opacity-50 cursor-grabbing scale-105 shadow-xl'
+    : 'cursor-grab';
+
   return (
-    <div className="flex items-start p-3 bg-white dark:bg-neutral-800 rounded-lg shadow relative mb-3">
+    <div
+      draggable="true"
+      onDragStart={(e) => {
+        // You can set custom drag image here if needed: e.dataTransfer.setDragImage(...)
+        handleDragStart(index);
+      }}
+      onDragEnter={(e) => handleDragEnter(index, e)}
+      onDragOver={handleDragOverEvents}
+      onDrop={(e) => {
+        e.preventDefault(); // Crucial for drop to work
+        handleDrop(index);
+      }}
+      onDragEnd={handleDragEnd}
+      onDragLeave={handleDragLeave}
+      className={`flex items-start p-3 bg-white dark:bg-neutral-800 rounded-lg shadow relative mb-3 transition-all duration-150 
+                  ${draggingStyles}
+                  ${dragOverRingClass}`}
+      aria-roledescription="Item de atividade arrastável"
+    >
       <div className={`w-1.5 h-auto self-stretch absolute left-0 top-0 bottom-0 rounded-l-lg ${activity.categoryColor}`}></div>
       <div className="ml-4 flex-grow flex items-center">
         <div className="flex-grow">

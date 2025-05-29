@@ -386,6 +386,18 @@ const App = (): JSX.Element => {
       });
   }, [saintDays, displayedYear, displayedMonth, filterOptions.showSaintDays]);
 
+  const activitiesForSelectedDateView = useMemo(() => {
+    // This list is passed to ActivitiesSection. It's already sorted by App.tsx's main sorting logic.
+    // ActivitiesSection will then filter this list by the specific selectedDate.
+    return activities.filter(act => {
+      if (act.activityType === ActivityType.EVENT && !filterOptions.showEvents) return false;
+      if (act.activityType === ActivityType.TASK && !filterOptions.showTasks) return false;
+      // Birthdays are always shown if their type is included, not tied to showEvents/showTasks filters
+      return true;
+    });
+  }, [activities, filterOptions.showEvents, filterOptions.showTasks]);
+
+
   return (
     <div className={`flex h-full font-sans antialiased overflow-hidden ${theme === Theme.DARK ? 'dark' : ''}`}>
 
@@ -488,15 +500,11 @@ const App = (): JSX.Element => {
 
               <ActivitiesSection
                 selectedDate={selectedDate}
-                activities={activities.filter(act => {
-                  if (act.activityType === ActivityType.EVENT && !filterOptions.showEvents) return false;
-                  if (act.activityType === ActivityType.TASK && !filterOptions.showTasks) return false;
-                  // Birthdays are shown if activities in general are considered, not tied to a specific filter yet
-                  return true;
-                })}
+                activities={activitiesForSelectedDateView}
                 onAddActivity={handleOpenCreateModal}
                 onEditActivity={handleEditActivity}
                 onDeleteActivityRequest={handleDeleteActivityRequest}
+                currentTheme={theme}
               />
 
               {filterOptions.showHolidays && (
