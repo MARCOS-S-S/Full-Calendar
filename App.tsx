@@ -25,6 +25,12 @@ export interface CalendarFilterOptions {
   showTasks: boolean;
 }
 
+// Define the new structure for eventsByDate
+export interface EventDateInfo {
+  colors: string[]; // Array of categoryColor strings for each activity
+  count: number;    // Total count of visible activities for the day
+}
+
 const App = (): JSX.Element => {
   const localizedMonthNames = MONTH_NAMES_PT;
   const localizedDayAbbreviations = DAY_ABBREVIATIONS_PT;
@@ -98,7 +104,7 @@ const App = (): JSX.Element => {
     } else {
       htmlElement.classList.remove('dark');
       if (themeColorMetaTag) {
-        themeColorMetaTag.content = '#f8fafc';
+        themeColorMetaTag.content = '#FFFFFF';
       }
     }
   }, [theme]);
@@ -279,17 +285,18 @@ const App = (): JSX.Element => {
   };
 
   const eventsByDate = useMemo(() => {
-    const mapping: Record<string, number> = {};
+    const mapping: Record<string, EventDateInfo> = {};
     activities.forEach(act => {
       const isVisibleEvent = filterOptions.showEvents && act.activityType === ActivityType.EVENT;
       const isVisibleTask = filterOptions.showTasks && act.activityType === ActivityType.TASK;
-      const isVisibleBirthday = act.activityType === ActivityType.BIRTHDAY;
+      const isVisibleBirthday = act.activityType === ActivityType.BIRTHDAY; // Birthdays are a type of activity
 
       if (isVisibleEvent || isVisibleTask || isVisibleBirthday) {
         if (!mapping[act.date]) {
-          mapping[act.date] = 0;
+          mapping[act.date] = { colors: [], count: 0 };
         }
-        mapping[act.date]++;
+        mapping[act.date].colors.push(act.categoryColor);
+        mapping[act.date].count++;
       }
     });
     return mapping;
@@ -484,6 +491,7 @@ const App = (): JSX.Element => {
                 activities={activities.filter(act => {
                   if (act.activityType === ActivityType.EVENT && !filterOptions.showEvents) return false;
                   if (act.activityType === ActivityType.TASK && !filterOptions.showTasks) return false;
+                  // Birthdays are shown if activities in general are considered, not tied to a specific filter yet
                   return true;
                 })}
                 onAddActivity={handleOpenCreateModal}

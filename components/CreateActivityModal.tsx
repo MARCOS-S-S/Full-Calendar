@@ -39,12 +39,12 @@ const formatTimeForInput = (date: Date): string => {
 };
 
 const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
-    isOpen,
-    onClose,
-    onSave,
-    selectedDate,
-    currentTheme,
-    activityToEdit,
+  isOpen,
+  onClose,
+  onSave,
+  selectedDate,
+  currentTheme,
+  activityToEdit,
 }) => {
   const [title, setTitle] = useState('');
   const [titleError, setTitleError] = useState<string | null>(null);
@@ -60,54 +60,59 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
   const [categoryColor, setCategoryColor] = useState<string>(activityTypeColors[ActivityType.EVENT]);
+  const [userHasPickedColor, setUserHasPickedColor] = useState<boolean>(false);
 
-  // ActivityType enum values are already in Portuguese in constants.ts
 
   useEffect(() => {
     if (isOpen) {
-        setTitleError(null); // Clear error on open
-        if (activityToEdit) {
-            setTitle(activityToEdit.title);
-            setActivityType(activityToEdit.activityType);
-            setIsAllDay(activityToEdit.isAllDay);
-            setStartDate(activityToEdit.date);
-            setStartTime(activityToEdit.startTime || formatTimeForInput(new Date(new Date().setHours(new Date().getHours() + 1, 0, 0, 0))));
+      setTitleError(null);
+      if (activityToEdit) {
+        setTitle(activityToEdit.title);
+        setActivityType(activityToEdit.activityType);
+        setIsAllDay(activityToEdit.isAllDay);
+        setStartDate(activityToEdit.date);
+        setStartTime(activityToEdit.startTime || formatTimeForInput(new Date(new Date().setHours(new Date().getHours() + 1, 0, 0, 0))));
 
-            const parsedStartDate = new Date(activityToEdit.date + 'T' + (activityToEdit.startTime || '00:00'));
-            setEndDate(activityToEdit.isAllDay ? activityToEdit.date : (activityToEdit.endTime ? activityToEdit.date : formatDateForInput(new Date(parsedStartDate.getTime() + 60 * 60 * 1000))));
-            setEndTime(activityToEdit.isAllDay ? formatTimeForInput(new Date(new Date().setHours(new Date().getHours() + 2, 0, 0, 0))) : (activityToEdit.endTime || formatTimeForInput(new Date(parsedStartDate.getTime() + 60 * 60 * 1000))));
+        const parsedStartDate = new Date(activityToEdit.date + 'T' + (activityToEdit.startTime || '00:00'));
+        setEndDate(activityToEdit.isAllDay ? activityToEdit.date : (activityToEdit.endTime ? activityToEdit.date : formatDateForInput(new Date(parsedStartDate.getTime() + 60 * 60 * 1000))));
+        setEndTime(activityToEdit.isAllDay ? formatTimeForInput(new Date(new Date().setHours(new Date().getHours() + 2, 0, 0, 0))) : (activityToEdit.endTime || formatTimeForInput(new Date(parsedStartDate.getTime() + 60 * 60 * 1000))));
 
-            setLocation(activityToEdit.location || '');
-            setDescription(activityToEdit.description || '');
-            setCategoryColor(activityToEdit.categoryColor);
-        } else {
-            const initialDate = new Date(selectedDate);
-            setTitle('');
-            setActivityType(ActivityType.EVENT);
-            setIsAllDay(true);
-            setStartDate(formatDateForInput(initialDate));
-            setStartTime(formatTimeForInput(new Date(initialDate.setHours(Math.min(23, initialDate.getHours() + 1), 0, 0, 0))));
-            setEndDate(formatDateForInput(initialDate));
-            setEndTime(formatTimeForInput(new Date(initialDate.setHours(Math.min(23, initialDate.getHours() + 2), 0, 0, 0))));
-            setLocation('');
-            setDescription('');
-            setCategoryColor(activityTypeColors[ActivityType.EVENT]);
-        }
+        setLocation(activityToEdit.location || '');
+        setDescription(activityToEdit.description || '');
+        setCategoryColor(activityToEdit.categoryColor);
+        setUserHasPickedColor(true); // For existing activities, consider the color "picked" or to be preserved
+      } else {
+        // New activity
+        const initialDate = new Date(selectedDate);
+        setTitle('');
+        setActivityType(ActivityType.EVENT);
+        setIsAllDay(true);
+        setStartDate(formatDateForInput(initialDate));
+        setStartTime(formatTimeForInput(new Date(initialDate.setHours(Math.min(23, initialDate.getHours() + 1), 0, 0, 0))));
+        setEndDate(formatDateForInput(initialDate));
+        setEndTime(formatTimeForInput(new Date(initialDate.setHours(Math.min(23, initialDate.getHours() + 2), 0, 0, 0))));
+        setLocation('');
+        setDescription('');
+        setCategoryColor(activityTypeColors[ActivityType.EVENT]); // Default color for the default type
+        setUserHasPickedColor(false); // User hasn't explicitly picked a color yet
+      }
     }
   }, [isOpen, selectedDate, activityToEdit]);
 
+  // This effect updates the categoryColor to the default when the activityType changes for a NEW activity,
+  // ONLY IF the user hasn't explicitly picked a color yet.
   useEffect(() => {
-    if (!activityToEdit || categoryColor === activityTypeColors[activityToEdit.activityType]) {
-        setCategoryColor(activityTypeColors[activityType]);
+    if (isOpen && !activityToEdit && !userHasPickedColor) {
+      setCategoryColor(activityTypeColors[activityType]);
     }
-  }, [activityType, activityToEdit, categoryColor]);
+  }, [isOpen, activityType, activityToEdit, userHasPickedColor]);
 
   const handleSave = () => {
     if (!title.trim()) {
       setTitleError("O título é obrigatório.");
       return;
     }
-    setTitleError(null); // Clear error if validation passes
+    setTitleError(null);
     const activityData: Omit<Activity, 'id'> & { id?: string } = {
       id: activityToEdit ? activityToEdit.id : undefined,
       title: title.trim(),
@@ -126,7 +131,7 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(e.target.value);
     if (titleError && e.target.value.trim()) {
-      setTitleError(null); // Clear error when user starts typing
+      setTitleError(null);
     }
   };
 
@@ -178,12 +183,15 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
             {[ActivityType.EVENT, ActivityType.TASK, ActivityType.BIRTHDAY].map(type => (
               <button
                 key={type}
-                onClick={() => setActivityType(type)}
-                className={`px-4 py-2 text-sm rounded-full border ${
-                  activityType === type
-                    ? (currentTheme === Theme.DARK ? 'bg-sky-500 border-sky-500 text-white' : 'bg-rose-500 border-rose-500 text-white')
-                    : (currentTheme === Theme.DARK ? 'border-neutral-600 text-neutral-300 hover:bg-neutral-700' : 'border-gray-300 text-gray-600 hover:bg-gray-100')
-                }`}
+                onClick={() => {
+                  setActivityType(type);
+                  // If not editing and user hasn't picked a color, set default color.
+                  // This is now handled by the useEffect listening to activityType and userHasPickedColor.
+                }}
+                className={`px-4 py-2 text-sm rounded-full border ${activityType === type
+                  ? (currentTheme === Theme.DARK ? 'bg-sky-500 border-sky-500 text-white' : 'bg-rose-500 border-rose-500 text-white')
+                  : (currentTheme === Theme.DARK ? 'border-neutral-600 text-neutral-300 hover:bg-neutral-700' : 'border-gray-300 text-gray-600 hover:bg-gray-100')
+                  }`}
               >
                 {type}
               </button>
@@ -191,47 +199,47 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
           </div>
 
           <div className={`py-3 border-b ${sectionBorderClass}`}>
-              <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center">
-                      <ClockIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
-                      <span className={textColorClass}>Dia inteiro</span>
-                  </div>
-                  <label htmlFor="all-day-toggle" className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" id="all-day-toggle" className="sr-only peer" checked={isAllDay} onChange={() => setIsAllDay(!isAllDay)} aria-label="Alternar status de evento de dia inteiro" />
-                      <div className={`w-11 h-6 rounded-full peer ${currentTheme === Theme.DARK ? 'bg-neutral-700 peer-checked:bg-sky-600' : 'bg-gray-200 peer-checked:bg-rose-500'} peer-focus:outline-none peer-focus:ring-2 ${currentTheme === Theme.DARK ? 'peer-focus:ring-sky-500' : 'peer-focus:ring-rose-500'} after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${currentTheme === Theme.DARK ? 'peer-checked:after:border-white' : ''} peer-checked:after:translate-x-full`}></div>
-                  </label>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center">
+                <ClockIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
+                <span className={textColorClass}>Dia inteiro</span>
               </div>
-              <div className="flex items-center space-x-2">
-                  <input aria-label="Data de início" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={`${inputBaseClass} ${inputBorderClass} flex-1 ${textColorClass}`} />
-                  {!isAllDay && <input aria-label="Hora de início" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className={`${inputBaseClass} ${inputBorderClass} w-28 ${textColorClass}`} />}
+              <label htmlFor="all-day-toggle" className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="all-day-toggle" className="sr-only peer" checked={isAllDay} onChange={() => setIsAllDay(!isAllDay)} aria-label="Alternar status de evento de dia inteiro" />
+                <div className={`w-11 h-6 rounded-full peer ${currentTheme === Theme.DARK ? 'bg-neutral-700 peer-checked:bg-sky-600' : 'bg-gray-200 peer-checked:bg-rose-500'} peer-focus:outline-none peer-focus:ring-2 ${currentTheme === Theme.DARK ? 'peer-focus:ring-sky-500' : 'peer-focus:ring-rose-500'} after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${currentTheme === Theme.DARK ? 'peer-checked:after:border-white' : ''} peer-checked:after:translate-x-full`}></div>
+              </label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input aria-label="Data de início" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={`${inputBaseClass} ${inputBorderClass} flex-1 ${textColorClass}`} />
+              {!isAllDay && <input aria-label="Hora de início" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className={`${inputBaseClass} ${inputBorderClass} w-28 ${textColorClass}`} />}
+            </div>
+            {!isAllDay && (
+              <div className="flex items-center space-x-2 mt-2">
+                <input aria-label="Data de término" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={`${inputBaseClass} ${inputBorderClass} flex-1 ${textColorClass}`} />
+                <input aria-label="Hora de término" type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className={`${inputBaseClass} ${inputBorderClass} w-28 ${textColorClass}`} />
               </div>
-               {!isAllDay && (
-                   <div className="flex items-center space-x-2 mt-2">
-                      <input aria-label="Data de término" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={`${inputBaseClass} ${inputBorderClass} flex-1 ${textColorClass}`} />
-                      <input aria-label="Hora de término" type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className={`${inputBaseClass} ${inputBorderClass} w-28 ${textColorClass}`} />
-                  </div>
-              )}
+            )}
           </div>
 
           <div className={`flex items-center py-3 border-b ${sectionBorderClass}`}>
-              <GlobeAltIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
-              <span className={textColorClass}>Horário Padrão de Brasília (Espaço reservado)</span>
+            <GlobeAltIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
+            <span className={textColorClass}>Horário Padrão de Brasília (Espaço reservado)</span>
           </div>
-           <div className={`flex items-center py-3 border-b ${sectionBorderClass}`}>
-              <ArrowPathIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
-              <span className={textColorClass}>Não se repete (Espaço reservado)</span>
+          <div className={`flex items-center py-3 border-b ${sectionBorderClass}`}>
+            <ArrowPathIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
+            <span className={textColorClass}>Não se repete (Espaço reservado)</span>
           </div>
 
           <div className={`py-3 border-b ${sectionBorderClass}`}>
-              <div className="flex items-center mb-2">
-                  <UserGroupIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
-                  <span className={textColorClass}>Adicionar pessoas (Espaço reservado)</span>
-              </div>
+            <div className="flex items-center mb-2">
+              <UserGroupIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
+              <span className={textColorClass}>Adicionar pessoas (Espaço reservado)</span>
+            </div>
           </div>
 
-           <div className={`flex items-center py-3 border-b ${sectionBorderClass}`}>
-              <VideoCameraIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
-              <span className={textColorClass}>Adicionar videoconferência (Espaço reservado)</span>
+          <div className={`flex items-center py-3 border-b ${sectionBorderClass}`}>
+            <VideoCameraIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
+            <span className={textColorClass}>Adicionar videoconferência (Espaço reservado)</span>
           </div>
 
           <div className={`flex items-center py-3 border-b ${sectionBorderClass}`}>
@@ -246,12 +254,12 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
           </div>
 
           <div className={`py-3 border-b ${sectionBorderClass}`}>
-              <div className="flex items-center justify-between">
-                   <div className="flex items-center">
-                      <BellIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
-                      <span className={textColorClass}>30 minutos antes (Espaço reservado)</span>
-                   </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <BellIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
+                <span className={textColorClass}>30 minutos antes (Espaço reservado)</span>
               </div>
+            </div>
           </div>
 
           <div className={`py-3 border-b ${sectionBorderClass}`}>
@@ -265,7 +273,10 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                   key={color.value}
                   title={color.name}
                   aria-label={color.name}
-                  onClick={() => setCategoryColor(color.value)}
+                  onClick={() => {
+                    setCategoryColor(color.value);
+                    setUserHasPickedColor(true); // User has made an explicit color choice
+                  }}
                   className={`w-8 h-8 rounded-full ${color.value} ${categoryColor === color.value ? (currentTheme === Theme.DARK ? 'ring-2 ring-offset-2 ring-offset-black ring-sky-400' : 'ring-2 ring-offset-2 ring-offset-slate-50 ring-rose-500') : ''}`}
                 />
               ))}
@@ -284,8 +295,8 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
           </div>
 
           <div className={`flex items-center py-3`}>
-              <PaperClipIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
-              <span className={textColorClass}>Adicionar anexo do Google Drive (Espaço reservado)</span>
+            <PaperClipIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
+            <span className={textColorClass}>Adicionar anexo do Google Drive (Espaço reservado)</span>
           </div>
         </main>
 
