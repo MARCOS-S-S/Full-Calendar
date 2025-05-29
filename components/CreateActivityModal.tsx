@@ -153,7 +153,10 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
       aria-modal="true"
       aria-labelledby="create-activity-title"
     >
-      <div className="flex flex-col h-full overflow-y-auto">
+      <div
+        className="flex flex-col h-full overflow-y-auto"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
+      >
         <header className={`flex items-center justify-between p-4 border-b ${sectionBorderClass}`}>
           <button onClick={onClose} className="p-2" aria-label="Fechar">
             <CloseIcon className={`w-6 h-6 ${currentTheme === Theme.DARK ? 'text-neutral-300' : 'text-gray-600'}`} />

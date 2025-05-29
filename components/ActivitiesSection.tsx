@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Activity } from '../constants';
 import ActivityItem from './ActivityItem';
@@ -9,6 +10,7 @@ interface ActivitiesSectionProps {
   onAddActivity: () => void;
   onEditActivity: (activity: Activity) => void;
   onDeleteActivityRequest: (activityId: string) => void;
+  // t and language props removed
 }
 
 const ActivitiesSection: React.FC<ActivitiesSectionProps> = ({
@@ -61,7 +63,7 @@ const ActivitiesSection: React.FC<ActivitiesSectionProps> = ({
         </div>
       </div>
       {filteredActivities.length > 0 ? (
-        <div className="space-y-0">
+        <div> {/* Removed space-y-0 from this div */}
           {filteredActivities.map(activity => (
             <ActivityItem
               key={activity.id}
@@ -72,8 +74,9 @@ const ActivitiesSection: React.FC<ActivitiesSectionProps> = ({
           ))}
         </div>
       ) : (
-        // A "caixa de diálogo" foi removida substituindo o JSX anterior por null
-        null
+        <div className="text-center py-8 text-gray-500 dark:text-neutral-400 bg-white dark:bg-neutral-800 rounded-lg shadow">
+          Nenhuma atividade agendada para este dia.
+        </div>
       )}
     </div>
   );
