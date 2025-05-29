@@ -53,78 +53,95 @@ const CustomRecurrenceModal: React.FC<CustomRecurrenceModalProps> = ({
             setOccurrencesError(null);
             setEndDateError(null);
 
+            // Default end date and occurrences for new/parsed rules if not specified
+            const defaultEndDateVal = new Date(initialActivityDate + 'T00:00:00');
+            defaultEndDateVal.setDate(defaultEndDateVal.getDate() + 7);
+            const defaultEndDateStr = defaultEndDateVal.toISOString().split('T')[0];
+            const defaultOccurrencesVal = 1;
+
+
             if (currentRRuleString) {
                 const parts = currentRRuleString.split(';');
-                let freq: FrequencyUnit = 'week'; // Default if FREQ is missing or invalid
-                let intVal = 1;
-                let bydayVal: string[] = [];
-                let endConditionVal: 'never' | 'date' | 'occurrences' = 'never';
-                let untilDateVal = '';
-                let countNumVal = 1;
+                let parsedFreq: FrequencyUnit = 'week';
+                let parsedIntervalVal = 1;
+                let parsedBydayVal: string[] = [];
+                let parsedEndConditionVal: 'never' | 'date' | 'occurrences' = 'never';
+                let parsedUntilDateVal = '';
+                let parsedCountNumVal = 1;
 
                 parts.forEach(part => {
                     const [key, valStr] = part.split('=', 2);
-                    const value = valStr === undefined ? "" : valStr; // Ensure value is a string
+                    const value = valStr === undefined ? "" : valStr;
 
                     switch (key) {
                         case 'FREQ':
-                            if (value === 'DAILY') freq = 'day';
-                            else if (value === 'WEEKLY') freq = 'week';
-                            else if (value === 'MONTHLY') freq = 'month';
-                            else if (value === 'YEARLY') freq = 'year';
+                            if (value === 'DAILY') parsedFreq = 'day';
+                            else if (value === 'WEEKLY') parsedFreq = 'week';
+                            else if (value === 'MONTHLY') parsedFreq = 'month';
+                            else if (value === 'YEARLY') parsedFreq = 'year';
                             break;
                         case 'INTERVAL':
-                            const parsedInterval = parseInt(value, 10);
-                            if (!isNaN(parsedInterval) && parsedInterval > 0) {
-                                intVal = parsedInterval;
+                            const parsedInt = parseInt(value, 10);
+                            if (!isNaN(parsedInt) && parsedInt > 0) {
+                                parsedIntervalVal = parsedInt;
                             }
                             break;
                         case 'BYDAY':
                             if (value) {
-                                bydayVal = value.split(',').filter(d => CUSTOM_RECURRENCE_DAY_CODES.includes(d));
+                                parsedBydayVal = value.split(',').filter(d => CUSTOM_RECURRENCE_DAY_CODES.includes(d));
                             } else {
-                                bydayVal = [];
+                                parsedBydayVal = [];
                             }
                             break;
                         case 'UNTIL':
-                            endConditionVal = 'date'; // Mark that an UNTIL rule exists
-                            // Check for YYYYMMDDTHHMMSSZ format
+                            parsedEndConditionVal = 'date';
                             if (value && value.length >= 8 && /^\d{8}T\d{6}Z$/.test(value)) {
-                                untilDateVal = `${value.substring(0, 4)}-${value.substring(4, 6)}-${value.substring(6, 8)}`;
+                                parsedUntilDateVal = `${value.substring(0, 4)}-${value.substring(4, 6)}-${value.substring(6, 8)}`;
                             } else {
-                                untilDateVal = ""; // Invalid or empty UNTIL value
+                                parsedUntilDateVal = defaultEndDateStr; // Fallback if UNTIL is present but invalid
                             }
                             break;
                         case 'COUNT':
-                            endConditionVal = 'occurrences'; // Mark that a COUNT rule exists
+                            // If UNTIL is also present, RFC 5545 says UNTIL is ignored.
+                            // For simplicity, we'll let the last parsed one (UNTIL or COUNT) determine parsedEndConditionVal.
+                            // A more robust parser would handle precedence if both are present.
+                            if (parsedEndConditionVal !== 'date') { // Prioritize UNTIL if already parsed
+                                parsedEndConditionVal = 'occurrences';
+                            }
                             const parsedCount = parseInt(value, 10);
                             if (!isNaN(parsedCount) && parsedCount > 0) {
-                                countNumVal = parsedCount;
+                                parsedCountNumVal = parsedCount;
+                            } else {
+                                parsedCountNumVal = defaultOccurrencesVal; // Fallback if COUNT is present but invalid
                             }
                             break;
                     }
                 });
-                setFrequencyUnit(freq);
-                setInterval(intVal);
-                setDaysOfWeek(bydayVal.length > 0 ? bydayVal : getDefaultDayForWeekly(initialActivityDate));
-                setEndsOn(endConditionVal);
 
-                if (endConditionVal === 'date') {
-                    setEndDate(untilDateVal);
-                } else if (endConditionVal === 'occurrences') {
-                    setOccurrences(countNumVal);
+                setFrequencyUnit(parsedFreq);
+                setInterval(parsedIntervalVal);
+                setDaysOfWeek(parsedBydayVal.length > 0 ? parsedBydayVal : getDefaultDayForWeekly(initialActivityDate));
+                setEndsOn(parsedEndConditionVal);
+
+                if (parsedEndConditionVal === 'date') {
+                    setEndDate(parsedUntilDateVal);
+                    setOccurrences(defaultOccurrencesVal); // Reset occurrences if switching to date
+                } else if (parsedEndConditionVal === 'occurrences') {
+                    setOccurrences(parsedCountNumVal);
+                    setEndDate(defaultEndDateStr); // Reset end date if switching to occurrences
+                } else { // parsedEndConditionVal is 'never'
+                    setEndDate(defaultEndDateStr);
+                    setOccurrences(defaultOccurrencesVal);
                 }
-                // If endConditionVal remained 'never', fields are not set from it.
+
             } else {
                 // Set defaults for new custom rule
                 setInterval(1);
                 setFrequencyUnit('week');
                 setDaysOfWeek(getDefaultDayForWeekly(initialActivityDate));
                 setEndsOn('never');
-                const today = new Date(initialActivityDate + 'T00:00:00');
-                today.setDate(today.getDate() + 7); // Default end date a week later for 'On' option
-                setEndDate(today.toISOString().split('T')[0]);
-                setOccurrences(1);
+                setEndDate(defaultEndDateStr);
+                setOccurrences(defaultOccurrencesVal);
             }
         }
     }, [isOpen, currentRRuleString, initialActivityDate]);
