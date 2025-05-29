@@ -1,4 +1,5 @@
 
+
 export enum ViewMode {
   MONTHLY = 'MONTHLY',
   YEARLY = 'YEARLY',
@@ -15,6 +16,25 @@ export enum ActivityType {
   BIRTHDAY = 'Aniversário', // Changed to Portuguese
 }
 
+export enum RecurrenceOption {
+  NONE = "Não se repete",
+  DAILY = "Todos os dias",
+  WEEKLY = "Toda semana",
+  MONTHLY = "Todo mês",
+  YEARLY = "Todo ano",
+  CUSTOM = "Personalizado..."
+}
+
+export const RECURRENCE_OPTIONS_PT: RecurrenceOption[] = [
+  RecurrenceOption.NONE,
+  RecurrenceOption.DAILY,
+  RecurrenceOption.WEEKLY,
+  RecurrenceOption.MONTHLY,
+  RecurrenceOption.YEARLY,
+  RecurrenceOption.CUSTOM,
+];
+
+
 export interface Activity {
   id: string;
   date: string; // YYYY-MM-DD (represents the start date)
@@ -26,6 +46,7 @@ export interface Activity {
   description?: string;
   categoryColor: string;
   activityType: ActivityType;
+  recurrenceRule?: RecurrenceOption; // Added for recurrence
 }
 
 export enum HolidayType {
@@ -71,7 +92,7 @@ export const MOCK_NATIONAL_HOLIDAYS_PT_BR: Holiday[] = [
   { date: '2004-11-02', name: 'Finados', type: HolidayType.NATIONAL },
   { date: '2004-11-15', name: 'Proclamação da República', type: HolidayType.NATIONAL },
   { date: '2004-12-25', name: 'Natal', type: HolidayType.NATIONAL },
-  
+
   // --- Amostra Passado Recente (ex: 2023) ---
   { date: '2023-01-01', name: 'Confraternização Universal', type: HolidayType.NATIONAL },
   { date: '2023-02-21', name: 'Carnaval (Ponto Facultativo Nacional)', type: HolidayType.NATIONAL },
@@ -109,7 +130,7 @@ export const MOCK_NATIONAL_HOLIDAYS_PT_BR: Holiday[] = [
   { date: '2025-11-02', name: 'Finados', type: HolidayType.NATIONAL },
   { date: '2025-11-15', name: 'Proclamação da República', type: HolidayType.NATIONAL },
   { date: '2025-12-25', name: 'Natal', type: HolidayType.NATIONAL },
-  
+
   { date: '2026-01-01', name: 'Confraternização Universal', type: HolidayType.NATIONAL },
   { date: '2026-02-17', name: 'Carnaval (Ponto Facultativo Nacional)', type: HolidayType.NATIONAL },
   { date: '2026-04-03', name: 'Sexta-feira Santa', type: HolidayType.NATIONAL },
@@ -173,7 +194,7 @@ export const MOCK_SAINT_DAYS_PT_BR: Holiday[] = [
   { date: '03-07', name: 'Santas Perpétua e Felicidade, mártires', type: HolidayType.SAINT },
   { date: '03-17', name: 'São Patrício, bispo', type: HolidayType.SAINT },
   { date: '03-19', name: 'São José, esposo da Virgem Maria', type: HolidayType.SAINT },
-  { date: '03-25', name: 'Anunciação do Senhor', type: HolidayType.SAINT }, 
+  { date: '03-25', name: 'Anunciação do Senhor', type: HolidayType.SAINT },
 
   // Abril
   { date: '04-23', name: 'São Jorge, mártir', type: HolidayType.SAINT },
@@ -301,7 +322,7 @@ export const MOCK_COMMEMORATIVE_DATES_PT_BR: Holiday[] = [
   { date: '2024-07-20', name: 'Dia do Amigo', type: HolidayType.COMMEMORATIVE },
   { date: '2024-08-11', name: 'Dia dos Pais', type: HolidayType.COMMEMORATIVE },
   { date: '2024-10-12', name: 'Dia das Crianças', type: HolidayType.COMMEMORATIVE },
-  
+
   // --- Amostra 2025 ---
   { date: '2025-03-08', name: 'Dia Internacional da Mulher', type: HolidayType.COMMEMORATIVE },
   { date: '2025-05-11', name: 'Dia das Mães', type: HolidayType.COMMEMORATIVE },

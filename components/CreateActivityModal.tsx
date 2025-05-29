@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
-import { Activity, ActivityType, Theme } from '../constants';
-import { CloseIcon, ClockIcon, LocationMarkerIcon, BellIcon, DocumentTextIcon, SparklesIcon, ArrowPathIcon, GlobeAltIcon, UserGroupIcon, VideoCameraIcon, PaperClipIcon } from './icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { Activity, ActivityType, Theme, RecurrenceOption, RECURRENCE_OPTIONS_PT } from '../constants';
+import { CloseIcon, ClockIcon, LocationMarkerIcon, BellIcon, DocumentTextIcon, SparklesIcon, ArrowPathIcon, GlobeAltIcon, UserGroupIcon, PaperClipIcon } from './icons';
 
 interface CreateActivityModalProps {
   isOpen: boolean;
@@ -10,7 +10,6 @@ interface CreateActivityModalProps {
   selectedDate: Date;
   currentTheme: Theme;
   activityToEdit?: Activity | null;
-  // t prop removed
 }
 
 const activityTypeColors: Record<ActivityType, string> = {
@@ -62,6 +61,11 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   const [categoryColor, setCategoryColor] = useState<string>(activityTypeColors[ActivityType.EVENT]);
   const [userHasPickedColor, setUserHasPickedColor] = useState<boolean>(false);
 
+  const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceOption>(RecurrenceOption.NONE);
+  const [isRecurrencePickerOpen, setIsRecurrencePickerOpen] = useState(false);
+  const recurrencePickerRef = useRef<HTMLDivElement>(null);
+  const recurrenceButtonRef = useRef<HTMLButtonElement>(null);
+
 
   useEffect(() => {
     if (isOpen) {
@@ -80,7 +84,8 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
         setLocation(activityToEdit.location || '');
         setDescription(activityToEdit.description || '');
         setCategoryColor(activityToEdit.categoryColor);
-        setUserHasPickedColor(true); // For existing activities, consider the color "picked" or to be preserved
+        setUserHasPickedColor(true);
+        setRecurrenceRule(activityToEdit.recurrenceRule || RecurrenceOption.NONE);
       } else {
         // New activity
         const initialDate = new Date(selectedDate);
@@ -93,19 +98,41 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
         setEndTime(formatTimeForInput(new Date(initialDate.setHours(Math.min(23, initialDate.getHours() + 2), 0, 0, 0))));
         setLocation('');
         setDescription('');
-        setCategoryColor(activityTypeColors[ActivityType.EVENT]); // Default color for the default type
-        setUserHasPickedColor(false); // User hasn't explicitly picked a color yet
+        setCategoryColor(activityTypeColors[ActivityType.EVENT]);
+        setUserHasPickedColor(false);
+        setRecurrenceRule(RecurrenceOption.NONE);
       }
+      setIsRecurrencePickerOpen(false); // Close picker on modal open/re-render
     }
   }, [isOpen, selectedDate, activityToEdit]);
 
-  // This effect updates the categoryColor to the default when the activityType changes for a NEW activity,
-  // ONLY IF the user hasn't explicitly picked a color yet.
   useEffect(() => {
     if (isOpen && !activityToEdit && !userHasPickedColor) {
       setCategoryColor(activityTypeColors[activityType]);
     }
   }, [isOpen, activityType, activityToEdit, userHasPickedColor]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isRecurrencePickerOpen &&
+        recurrencePickerRef.current &&
+        !recurrencePickerRef.current.contains(event.target as Node) &&
+        recurrenceButtonRef.current &&
+        !recurrenceButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsRecurrencePickerOpen(false);
+      }
+    };
+
+    if (isRecurrencePickerOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isRecurrencePickerOpen]);
+
 
   const handleSave = () => {
     if (!title.trim()) {
@@ -124,6 +151,7 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
       location: location.trim() || undefined,
       description: description.trim() || undefined,
       categoryColor,
+      recurrenceRule,
     };
     onSave(activityData);
   };
@@ -135,6 +163,11 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
     }
   };
 
+  const handleRecurrenceOptionSelect = (option: RecurrenceOption) => {
+    setRecurrenceRule(option);
+    setIsRecurrencePickerOpen(false);
+  };
+
   const inputBaseClass = "w-full bg-transparent border-b py-2 focus:outline-none text-sm";
   const inputBorderClass = currentTheme === Theme.LIGHT ? "border-gray-300 focus:border-rose-500" : "border-neutral-700 focus:border-sky-500";
   const iconColorClass = currentTheme === Theme.LIGHT ? "text-gray-500" : "text-neutral-400";
@@ -142,6 +175,11 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   const placeholderColorClass = currentTheme === Theme.LIGHT ? "placeholder-gray-400" : "placeholder-neutral-500";
   const sectionBorderClass = currentTheme === Theme.LIGHT ? "border-gray-200" : "border-neutral-700";
   const errorTextColorClass = currentTheme === Theme.LIGHT ? "text-red-600" : "text-red-400";
+  const pickerBgColor = currentTheme === Theme.LIGHT ? 'bg-white' : 'bg-neutral-800';
+  const pickerTextColor = currentTheme === Theme.LIGHT ? 'text-gray-800' : 'text-neutral-100';
+  const pickerBorderColor = currentTheme === Theme.LIGHT ? 'border-gray-300' : 'border-neutral-700';
+  const radioSelectedColor = currentTheme === Theme.LIGHT ? 'border-rose-500 bg-rose-500' : 'border-sky-500 bg-sky-500';
+  const radioUnselectedColor = currentTheme === Theme.LIGHT ? 'border-gray-400' : 'border-neutral-500';
 
 
   if (!isOpen) return null;
@@ -181,19 +219,17 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
           </div>
         </header>
 
-        <main className="flex-grow p-4 space-y-6">
+        <main className="flex-grow p-4 space-y-6 relative">
           <div className="flex space-x-2">
             {[ActivityType.EVENT, ActivityType.TASK, ActivityType.BIRTHDAY].map(type => (
               <button
                 key={type}
                 onClick={() => {
                   setActivityType(type);
-                  // If not editing and user hasn't picked a color, set default color.
-                  // This is now handled by the useEffect listening to activityType and userHasPickedColor.
                 }}
                 className={`px-4 py-2 text-sm rounded-full border ${activityType === type
-                  ? (currentTheme === Theme.DARK ? 'bg-sky-500 border-sky-500 text-white' : 'bg-rose-500 border-rose-500 text-white')
-                  : (currentTheme === Theme.DARK ? 'border-neutral-600 text-neutral-300 hover:bg-neutral-700' : 'border-gray-300 text-gray-600 hover:bg-gray-100')
+                    ? (currentTheme === Theme.DARK ? 'bg-sky-500 border-sky-500 text-white' : 'bg-rose-500 border-rose-500 text-white')
+                    : (currentTheme === Theme.DARK ? 'border-neutral-600 text-neutral-300 hover:bg-neutral-700' : 'border-gray-300 text-gray-600 hover:bg-gray-100')
                   }`}
               >
                 {type}
@@ -228,21 +264,51 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
             <GlobeAltIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
             <span className={textColorClass}>Horário Padrão de Brasília (Espaço reservado)</span>
           </div>
-          <div className={`flex items-center py-3 border-b ${sectionBorderClass}`}>
-            <ArrowPathIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
-            <span className={textColorClass}>Não se repete (Espaço reservado)</span>
+
+          <div className={`py-3 border-b ${sectionBorderClass} relative`}>
+            <button
+              ref={recurrenceButtonRef}
+              onClick={() => setIsRecurrencePickerOpen(!isRecurrencePickerOpen)}
+              className={`flex items-center w-full text-left ${textColorClass} hover:opacity-80`}
+              aria-haspopup="listbox"
+              aria-expanded={isRecurrencePickerOpen}
+              aria-controls="recurrence-options-list"
+            >
+              <ArrowPathIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
+              <span>{recurrenceRule}</span>
+            </button>
+            {isRecurrencePickerOpen && (
+              <div
+                ref={recurrencePickerRef}
+                id="recurrence-options-list"
+                className={`absolute left-0 right-0 mt-2 p-3 rounded-lg shadow-xl z-10 ${pickerBgColor} ${pickerBorderColor} border`}
+                role="listbox"
+                aria-activedescendant={recurrenceRule} // Might need to assign IDs to options for this
+              >
+                {RECURRENCE_OPTIONS_PT.map(option => (
+                  <div
+                    key={option}
+                    role="option"
+                    aria-selected={recurrenceRule === option}
+                    onClick={() => handleRecurrenceOptionSelect(option)}
+                    className={`flex items-center p-2.5 rounded-md cursor-pointer ${pickerTextColor} ${currentTheme === Theme.LIGHT ? 'hover:bg-gray-100' : 'hover:bg-neutral-700'}`}
+                  >
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mr-3 ${recurrenceRule === option ? radioSelectedColor : radioUnselectedColor}`}>
+                      {recurrenceRule === option && <div className="w-2.5 h-2.5 bg-white rounded-full"></div>}
+                    </div>
+                    <span>{option}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+
 
           <div className={`py-3 border-b ${sectionBorderClass}`}>
             <div className="flex items-center mb-2">
               <UserGroupIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
               <span className={textColorClass}>Adicionar pessoas (Espaço reservado)</span>
             </div>
-          </div>
-
-          <div className={`flex items-center py-3 border-b ${sectionBorderClass}`}>
-            <VideoCameraIcon className={`w-5 h-5 mr-3 ${iconColorClass}`} />
-            <span className={textColorClass}>Adicionar videoconferência (Espaço reservado)</span>
           </div>
 
           <div className={`flex items-center py-3 border-b ${sectionBorderClass}`}>
@@ -278,7 +344,7 @@ const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                   aria-label={color.name}
                   onClick={() => {
                     setCategoryColor(color.value);
-                    setUserHasPickedColor(true); // User has made an explicit color choice
+                    setUserHasPickedColor(true);
                   }}
                   className={`w-8 h-8 rounded-full ${color.value} ${categoryColor === color.value ? (currentTheme === Theme.DARK ? 'ring-2 ring-offset-2 ring-offset-black ring-sky-400' : 'ring-2 ring-offset-2 ring-offset-slate-50 ring-rose-500') : ''}`}
                 />

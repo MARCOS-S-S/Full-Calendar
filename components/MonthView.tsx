@@ -77,9 +77,11 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
           let hoverClasses = ' hover:bg-gray-100 dark:hover:bg-neutral-700 ';
 
           if (isSelected) {
-            cellClasses += isToday ? ' bg-sky-500 dark:bg-sky-600 ' : ' bg-rose-500 dark:bg-rose-600 ';
+            // Sempre usar azul para seleção, independentemente de ser 'hoje' ou não.
+            cellClasses += ' bg-sky-500 dark:bg-sky-600 ';
             textClasses = ' text-white font-semibold';
           } else {
+            // Estilos para dias não selecionados (hoje, feriados, etc.)
             if (holidayInfo) {
               switch (holidayInfo.type) {
                 case HolidayType.NATIONAL:
@@ -89,21 +91,21 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                   textClasses = 'text-green-600 dark:text-green-400 font-semibold';
                   break;
                 case HolidayType.SAINT:
-                  textClasses = 'text-blue-600 dark:text-blue-400 font-semibold';
+                  textClasses = 'text-blue-600 dark:text-blue-400 font-semibold'; // Mantém azul para dias de santo não selecionados
                   break;
                 default:
                   textClasses = 'text-gray-700 dark:text-neutral-200';
                   break;
               }
-              if (isToday) {
+              if (isToday) { // Se for um feriado E também hoje (mas não selecionado)
                 hoverClasses = ' hover:bg-purple-100 dark:hover:bg-purple-700/50 ';
               }
-            } else if (isToday) {
+            } else if (isToday) { // Se for apenas hoje (e não selecionado)
               textClasses = ' text-purple-600 dark:text-purple-400 font-semibold';
               hoverClasses = ' hover:bg-purple-100 dark:hover:bg-purple-700/50 ';
-            } else if (dayOfWeek === 0) {
+            } else if (dayOfWeek === 0) { // Domingo não selecionado
               textClasses = 'text-red-500 dark:text-red-400';
-            } else {
+            } else { // Dia normal não selecionado
               textClasses = 'text-gray-700 dark:text-neutral-200';
             }
             cellClasses += hoverClasses;
@@ -135,7 +137,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                   {activityColors.slice(0, 3).map((color, i) => (
                     <span
                       key={i}
-                      className={`h-1 w-1 rounded-full ${isSelected ? 'bg-white' : color}`}
+                      className={`h-1 w-1 rounded-full ${isSelected ? 'bg-white' : color}`} // Se selecionado, bolinhas brancas, senão usa a cor da atividade
                     ></span>
                   ))}
                 </div>

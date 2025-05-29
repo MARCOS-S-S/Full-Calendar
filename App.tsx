@@ -13,7 +13,8 @@ import SettingsModal from './components/SettingsModal';
 import WelcomeHeader from './components/WelcomeHeader';
 import {
   ViewMode, Theme, Activity, Holiday, MOCK_NATIONAL_HOLIDAYS_PT_BR, MOCK_ACTIVITIES, ActivityType, HolidayType,
-  MONTH_NAMES_PT, DAY_ABBREVIATIONS_PT, DAY_NAMES_PT, MOCK_SAINT_DAYS_PT_BR, MOCK_COMMEMORATIVE_DATES_PT_BR
+  MONTH_NAMES_PT, DAY_ABBREVIATIONS_PT, DAY_NAMES_PT, MOCK_SAINT_DAYS_PT_BR, MOCK_COMMEMORATIVE_DATES_PT_BR,
+  RecurrenceOption
 } from './constants';
 import { MenuIcon, CloseIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon } from './components/icons';
 
@@ -208,7 +209,7 @@ const App = (): JSX.Element => {
   };
 
   const handleSaveActivity = (activityData: Omit<Activity, 'id'> & { id?: string }) => {
-    if (activityData.id) {
+    if (activityData.id && !activityData.id.startsWith('temp-')) { // Ensure not saving a temp ID from edit of recurrence
       setActivities(prevActivities =>
         prevActivities.map(act => act.id === activityData.id ? { ...act, ...activityData } as Activity : act)
           .sort((a, b) => {
@@ -222,7 +223,7 @@ const App = (): JSX.Element => {
     } else {
       const newActivity: Activity = {
         ...activityData,
-        id: String(Date.now() + Math.random()),
+        id: String(Date.now() + Math.random()), // Generate new ID for new activity
       } as Activity;
       setActivities(prevActivities => [...prevActivities, newActivity].sort((a, b) => {
         const aTime = a.isAllDay ? "00:00" : a.startTime || "00:00";
@@ -237,12 +238,18 @@ const App = (): JSX.Element => {
   };
 
   const handleEditActivity = (activity: Activity) => {
-    setActivityToEdit(activity);
+    // If the activity ID indicates it's a recurring instance (e.g., 'originalId-recur-date')
+    // we need to find the original activity to edit.
+    const originalId = activity.id.includes('-recur-') ? activity.id.split('-recur-')[0] : activity.id;
+    const activityToLoadForEdit = activities.find(act => act.id === originalId) || activity;
+
+    setActivityToEdit({ ...activityToLoadForEdit, date: activity.date }); // Pass the specific instance date for pre-filling
     setIsCreateModalOpen(true);
   };
 
   const handleDeleteActivityRequest = (activityId: string) => {
-    setActivityIdToDelete(activityId);
+    const originalId = activityId.includes('-recur-') ? activityId.split('-recur-')[0] : activityId;
+    setActivityIdToDelete(originalId);
     setIsConfirmDeleteModalOpen(true);
   };
 
@@ -286,21 +293,126 @@ const App = (): JSX.Element => {
 
   const eventsByDate = useMemo(() => {
     const mapping: Record<string, EventDateInfo> = {};
-    activities.forEach(act => {
-      const isVisibleEvent = filterOptions.showEvents && act.activityType === ActivityType.EVENT;
-      const isVisibleTask = filterOptions.showTasks && act.activityType === ActivityType.TASK;
-      const isVisibleBirthday = act.activityType === ActivityType.BIRTHDAY; // Birthdays are a type of activity
+    const viewStartDate = new Date(displayedYear, displayedMonth, 1);
+    viewStartDate.setHours(0, 0, 0, 0);
+    const viewEndDate = new Date(displayedYear, displayedMonth + 1, 0);
+    viewEndDate.setHours(23, 59, 59, 999);
 
-      if (isVisibleEvent || isVisibleTask || isVisibleBirthday) {
-        if (!mapping[act.date]) {
-          mapping[act.date] = { colors: [], count: 0 };
+    const addActivityToMapping = (activity: Activity, date: Date) => {
+      const dateStr = date.toISOString().split('T')[0];
+      const isVisibleEvent = filterOptions.showEvents && activity.activityType === ActivityType.EVENT;
+      const isVisibleTask = filterOptions.showTasks && activity.activityType === ActivityType.TASK;
+      const isVisibleBirthday = activity.activityType === ActivityType.BIRTHDAY;
+
+      if (!isVisibleEvent && !isVisibleTask && !isVisibleBirthday) {
+        return;
+      }
+
+      if (!mapping[dateStr]) {
+        mapping[dateStr] = { colors: [], count: 0 };
+      }
+      mapping[dateStr].colors.push(activity.categoryColor);
+      mapping[dateStr].count++;
+    };
+
+    activities.forEach(act => {
+      const originalActivityDate = new Date(act.date + 'T00:00:00');
+      if (isNaN(originalActivityDate.getTime())) {
+        console.warn("Invalid date for activity:", act);
+        return;
+      }
+
+      if (originalActivityDate >= viewStartDate && originalActivityDate <= viewEndDate) {
+        addActivityToMapping(act, originalActivityDate);
+      }
+
+      if (act.recurrenceRule && act.recurrenceRule !== RecurrenceOption.NONE && act.recurrenceRule !== RecurrenceOption.CUSTOM) {
+        let currentDate = new Date(originalActivityDate);
+        const maxRecurrenceYear = displayedYear + 2;
+
+        switch (act.recurrenceRule) {
+          case RecurrenceOption.DAILY:
+            currentDate.setDate(currentDate.getDate() + 1);
+            while (currentDate <= viewEndDate && currentDate.getFullYear() < maxRecurrenceYear) {
+              if (currentDate >= viewStartDate) {
+                addActivityToMapping(act, new Date(currentDate));
+              }
+              currentDate.setDate(currentDate.getDate() + 1);
+            }
+            break;
+
+          case RecurrenceOption.WEEKLY:
+            currentDate.setDate(currentDate.getDate() + 7);
+            while (currentDate <= viewEndDate && currentDate.getFullYear() < maxRecurrenceYear) {
+              if (currentDate >= viewStartDate) {
+                addActivityToMapping(act, new Date(currentDate));
+              }
+              currentDate.setDate(currentDate.getDate() + 7);
+            }
+            break;
+
+          case RecurrenceOption.MONTHLY:
+            const originalDayOfMonth = originalActivityDate.getDate();
+            currentDate = new Date(originalActivityDate); // Reset current date to original
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            currentDate.setDate(originalDayOfMonth);
+
+            while (currentDate.getFullYear() < maxRecurrenceYear) {
+              if (currentDate.getDate() !== originalDayOfMonth) { // Day rolled over
+                let nextTryDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), originalDayOfMonth);
+                if (nextTryDate.getMonth() === currentDate.getMonth() && nextTryDate.getDate() !== originalDayOfMonth) { // still didn't work
+                  // This means original day doesn't exist this month, advance to next month for next loop iteration
+                  currentDate.setMonth(currentDate.getMonth() + 1);
+                  currentDate.setDate(originalDayOfMonth);
+                  continue;
+                } else {
+                  currentDate = nextTryDate;
+                }
+              }
+              if (currentDate > viewEndDate && currentDate.getFullYear() === displayedYear && currentDate.getMonth() === displayedMonth) break;
+              if (currentDate > viewEndDate && (currentDate.getFullYear() > displayedYear || currentDate.getMonth() > displayedMonth)) break;
+
+
+              if (currentDate >= viewStartDate && currentDate <= viewEndDate) {
+                addActivityToMapping(act, new Date(currentDate));
+              }
+
+              currentDate.setMonth(currentDate.getMonth() + 1);
+              currentDate.setDate(originalDayOfMonth);
+            }
+            break;
+
+          case RecurrenceOption.YEARLY:
+            const originalMonth = originalActivityDate.getMonth();
+            const originalYrDay = originalActivityDate.getDate();
+            currentDate = new Date(originalActivityDate); // Reset
+            currentDate.setFullYear(currentDate.getFullYear() + 1);
+            currentDate.setMonth(originalMonth);
+            currentDate.setDate(originalYrDay);
+
+            while (currentDate.getFullYear() < maxRecurrenceYear + 3) {
+              if (currentDate.getMonth() !== originalMonth || currentDate.getDate() !== originalYrDay) {
+                currentDate = new Date(currentDate.getFullYear() + 1, originalMonth, originalYrDay);
+                continue;
+              }
+              if (currentDate > viewEndDate && currentDate.getFullYear() === displayedYear && currentDate.getMonth() === displayedMonth) break;
+              if (currentDate > viewEndDate && (currentDate.getFullYear() > displayedYear || currentDate.getMonth() > displayedMonth)) break;
+
+
+              if (currentDate >= viewStartDate && currentDate <= viewEndDate) {
+                addActivityToMapping(act, new Date(currentDate));
+              }
+              currentDate.setFullYear(currentDate.getFullYear() + 1);
+              currentDate.setMonth(originalMonth);
+              currentDate.setDate(originalYrDay);
+            }
+            break;
         }
-        mapping[act.date].colors.push(act.categoryColor);
-        mapping[act.date].count++;
       }
     });
     return mapping;
-  }, [activities, filterOptions.showEvents, filterOptions.showTasks]);
+  }, [activities, filterOptions.showEvents, filterOptions.showTasks, displayedYear, displayedMonth]);
+
 
   const holidaysByDate = useMemo(() => {
     const mapping: Record<string, Holiday> = {};
@@ -387,15 +499,113 @@ const App = (): JSX.Element => {
   }, [saintDays, displayedYear, displayedMonth, filterOptions.showSaintDays]);
 
   const activitiesForSelectedDateView = useMemo(() => {
-    // This list is passed to ActivitiesSection. It's already sorted by App.tsx's main sorting logic.
-    // ActivitiesSection will then filter this list by the specific selectedDate.
-    return activities.filter(act => {
-      if (act.activityType === ActivityType.EVENT && !filterOptions.showEvents) return false;
-      if (act.activityType === ActivityType.TASK && !filterOptions.showTasks) return false;
-      // Birthdays are always shown if their type is included, not tied to showEvents/showTasks filters
-      return true;
+    if (!selectedDate) return [];
+
+    const selectedDateString = selectedDate.toISOString().split('T')[0];
+    const targetDate = new Date(selectedDateString + 'T00:00:00');
+    const activitiesOccurringOnSelectedDate: Activity[] = [];
+    const addedOriginalActivityIds = new Set<string>();
+
+
+    const addActivityInstanceToList = (activity: Activity, instanceDateString: string, isRecurrence: boolean) => {
+      if (activity.activityType === ActivityType.EVENT && !filterOptions.showEvents) return;
+      if (activity.activityType === ActivityType.TASK && !filterOptions.showTasks) return;
+
+      const instanceId = isRecurrence ? `${activity.id}-recur-${instanceDateString}` : activity.id;
+
+      // Avoid adding the same original activity multiple times if its original date is the selectedDate
+      // AND it also matches a recurrence check for the same day (which shouldn't happen with current recurrence logic).
+      // More importantly, ensure that if original day = selected date, we don't add it again via recurrence path.
+      if (addedOriginalActivityIds.has(activity.id) && activity.date === instanceDateString && !isRecurrence) {
+        // Already added as original, and this is an attempt to add original again.
+        return;
+      }
+      if (addedOriginalActivityIds.has(activity.id) && isRecurrence) {
+        // If original was already added (because its date is selectedDate), don't add its "recurrence" on the same day.
+        // This check is a bit nuanced. The main goal is one visual entry per distinct activity on a given day.
+      }
+
+
+      activitiesOccurringOnSelectedDate.push({
+        ...activity,
+        date: instanceDateString,
+        id: instanceId,
+      });
+      if (!isRecurrence) {
+        addedOriginalActivityIds.add(activity.id);
+      }
+    };
+
+    activities.forEach(act => {
+      const originalActivityDate = new Date(act.date + 'T00:00:00');
+      if (isNaN(originalActivityDate.getTime())) return;
+
+      // 1. Check original instance
+      if (act.date === selectedDateString) {
+        addActivityInstanceToList(act, selectedDateString, false);
+      }
+      // 2. Check recurring instances (only if original date is NOT the selected date for this path)
+      else if (act.recurrenceRule && act.recurrenceRule !== RecurrenceOption.NONE && act.recurrenceRule !== RecurrenceOption.CUSTOM && targetDate >= originalActivityDate) {
+        let occursOnSelectedDate = false;
+        switch (act.recurrenceRule) {
+          case RecurrenceOption.DAILY: // A daily event occurs on targetDate if targetDate >= originalActivityDate
+            occursOnSelectedDate = true;
+            break;
+          case RecurrenceOption.WEEKLY:
+            if (targetDate.getDay() === originalActivityDate.getDay()) {
+              const diffTime = targetDate.getTime() - originalActivityDate.getTime(); // Difference in milliseconds
+              if (diffTime >= 0) { // Ensure targetDate is on or after originalActivityDate
+                const diffDays = diffTime / (1000 * 60 * 60 * 24);
+                if (diffDays % 7 === 0) {
+                  occursOnSelectedDate = true;
+                }
+              }
+            }
+            break;
+          case RecurrenceOption.MONTHLY:
+            if (targetDate.getDate() === originalActivityDate.getDate()) {
+              // Ensure it's actually a future month or year if not the original date
+              if (targetDate.getFullYear() > originalActivityDate.getFullYear() ||
+                (targetDate.getFullYear() === originalActivityDate.getFullYear() && targetDate.getMonth() > originalActivityDate.getMonth())) {
+                occursOnSelectedDate = true;
+              }
+            }
+            break;
+          case RecurrenceOption.YEARLY:
+            if (targetDate.getMonth() === originalActivityDate.getMonth() &&
+              targetDate.getDate() === originalActivityDate.getDate()) {
+              // Ensure it's actually a future year if not the original date
+              if (targetDate.getFullYear() > originalActivityDate.getFullYear()) {
+                occursOnSelectedDate = true;
+              }
+            }
+            break;
+        }
+        if (occursOnSelectedDate) {
+          // Check if this specific recurrence (identified by original act.id) is already added
+          // This is to prevent adding it if its original date was also the selectedDate and already handled.
+          if (!addedOriginalActivityIds.has(act.id) || act.date !== selectedDateString) {
+            addActivityInstanceToList(act, selectedDateString, true);
+          }
+        }
+      }
     });
-  }, [activities, filterOptions.showEvents, filterOptions.showTasks]);
+
+    // Deduplicate based on the generated instanceId to ensure each visual item is unique
+    const finalActivitiesMap = new Map<string, Activity>();
+    activitiesOccurringOnSelectedDate.forEach(activity => {
+      finalActivitiesMap.set(activity.id, activity);
+    });
+    const uniqueActivities = Array.from(finalActivitiesMap.values());
+
+    return uniqueActivities.sort((a, b) => {
+      const aTime = a.isAllDay ? "00:00" : a.startTime || "00:00";
+      const bTime = b.isAllDay ? "00:00" : b.startTime || "00:00";
+      if (a.isAllDay && !b.isAllDay) return -1;
+      if (!a.isAllDay && b.isAllDay) return 1;
+      return aTime.localeCompare(bTime);
+    });
+  }, [activities, selectedDate, filterOptions.showEvents, filterOptions.showTasks]);
 
 
   return (
